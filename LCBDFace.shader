@@ -514,8 +514,8 @@ Shader "LCBDshader/Face"
 			uniform float _RimHorizonOffset2;
 			uniform float _RimFeather2;
 			uniform float _Use_DisRimMask;
-			uniform sampler2D _CtrlTex;
-			uniform float4 _CtrlTex_ST;
+			uniform sampler2D _BaseTex;
+			uniform float4 _BaseTex_ST;
 			uniform float _NormalRemap;
 			uniform sampler2D _BumpMap;
 			uniform float4 _BumpMap_ST;
@@ -526,8 +526,6 @@ Shader "LCBDshader/Face"
 			uniform float _RimAttenuation3;
 			uniform float _RimShadowRate2;
 			uniform float _SpecularPower;
-			uniform sampler2D _BaseTex;
-			uniform float4 _BaseTex_ST;
 			uniform float _SpecularBias;
 			uniform float _NoShadowinDirectionalLightColor;
 			uniform float _MinDirectLight;
@@ -556,6 +554,8 @@ Shader "LCBDshader/Face"
 			uniform float _EnvBias;
 			uniform float _EnvRate;
 			uniform float _Use_MetalMask;
+			uniform sampler2D _CtrlTex;
+			uniform float4 _CtrlTex_ST;
 			uniform float _RimAttenuation;
 			uniform float _RimShadowRate;
 			uniform float4 _RimColor;
@@ -781,9 +781,9 @@ Shader "LCBDshader/Face"
 				float3 ase_worldNormal = i.ase_texcoord2.xyz;
 				float dotResult505 = dot( ( ( -1.0 * localv_bias502 * _RimVerticalOffset2 ) + ( ( 1.0 - abs( _RimVerticalOffset2 ) ) * ( ( -1.0 * localh_bias510 * _RimHorizonOffset2 ) + ( ( 1.0 - abs( _RimHorizonOffset2 ) ) * ase_worldViewDir ) ) ) ) , ase_worldNormal );
 				float rimoffset_Facing2513 = dotResult505;
-				float2 uv_CtrlTex = i.ase_texcoord3.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
-				float4 tex2DNode67 = tex2D( _CtrlTex, uv_CtrlTex );
-				float RimMask355 = tex2DNode67.b;
+				float2 uv_BaseTex = i.ase_texcoord3.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
+				float4 tex2DNode66 = tex2D( _BaseTex, uv_BaseTex );
+				float RimMask355 = tex2DNode66.b;
 				float dis_rim360 = ( (( _Use_DisRimMask )?( ( RimMask355 - 0.5 ) ):( 0.0 )) + 0.5 );
 				float RimStrength2462 = ( _RimColor2.a * pow( saturate( ( ( _RimStep2 - rimoffset_Facing2513 ) / _RimFeather2 ) ) , 3.0 ) * dis_rim360 );
 				float localIsThereALight797 = IsThereALight797();
@@ -820,8 +820,6 @@ Shader "LCBDshader/Face"
 				float dotResult129 = dot( ase_worldViewDir , fixed_worldnormal928 );
 				float Facing136 = dotResult129;
 				float fixed_specpower623 = exp2( ( ( _SpecularPower * -10.0 ) + 11.0 ) );
-				float2 uv_BaseTex = i.ase_texcoord3.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
-				float4 tex2DNode66 = tex2D( _BaseTex, uv_BaseTex );
 				float SpecularMask1358 = tex2DNode66.g;
 				float SpecularPower438 = ( min( pow( max( Facing136 , 0.0 ) , ( ( fixed_specpower623 * 10.0 ) + 1.0 ) ) , 1.0 ) * SpecularMask1358 * (0.0 + (_SpecularBias - 0.0) * (100.0 - 0.0) / (10.0 - 0.0)) );
 				float3 temp_cast_1 = (_MinDirectLight).xxx;
@@ -884,7 +882,8 @@ Shader "LCBDshader/Face"
 				float3 viewDir1337 = ase_worldViewDir;
 				float2 localgetMatcapUVs1337 = getMatcapUVs1337( normal1337 , viewDir1337 );
 				float2 matcapUV1338 = localgetMatcapUVs1337;
-				float MetalMask350 = (( _Use_MetalMask )?( tex2DNode67.g ):( 0.0 ));
+				float2 uv_CtrlTex = i.ase_texcoord3.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
+				float MetalMask350 = (( _Use_MetalMask )?( tex2D( _CtrlTex, uv_CtrlTex ).g ):( 0.0 ));
 				float4 lerpResult532 = lerp( specshaded_diff445 , ( specshaded_diff445 * tex2D( _EnvTex, (( _EnvMatCap )?( float3( matcapUV1338 ,  0.0 ) ):( ( ( float3( float2( 1,1 ) ,  0.0 ) + normal2view521 ) * 0.5 ) )).xy ) * (0.0 + (_EnvBias - 0.0) * (100.0 - 0.0) / (10.0 - 0.0)) ) , saturate( ( (0.0 + (_EnvRate - 0.0) * (100.0 - 0.0) / (10.0 - 0.0)) * MetalMask350 ) ));
 				float4 EnvSpecShaded_diff542 = lerpResult532;
 				float lerpResult1064 = lerp( LambertTerm552 , ( LambertTerm552 * RimAtten1057 ) , _RimAttenuation);
@@ -1000,8 +999,8 @@ Shader "LCBDshader/Face"
 			uniform float _RimHorizonOffset2;
 			uniform float _RimFeather2;
 			uniform float _Use_DisRimMask;
-			uniform sampler2D _CtrlTex;
-			uniform float4 _CtrlTex_ST;
+			uniform sampler2D _BaseTex;
+			uniform float4 _BaseTex_ST;
 			uniform float _NormalRemap;
 			uniform sampler2D _BumpMap;
 			uniform float4 _BumpMap_ST;
@@ -1012,8 +1011,6 @@ Shader "LCBDshader/Face"
 			uniform float _RimAttenuation3;
 			uniform float _RimShadowRate2;
 			uniform float _SpecularPower;
-			uniform sampler2D _BaseTex;
-			uniform float4 _BaseTex_ST;
 			uniform float _SpecularBias;
 			uniform float _NoShadowinDirectionalLightColor;
 			uniform float _MinDirectLight;
@@ -1042,6 +1039,8 @@ Shader "LCBDshader/Face"
 			uniform float _EnvBias;
 			uniform float _EnvRate;
 			uniform float _Use_MetalMask;
+			uniform sampler2D _CtrlTex;
+			uniform float4 _CtrlTex_ST;
 			uniform float _RimAttenuation;
 			uniform float _RimShadowRate;
 			uniform float4 _RimColor;
@@ -1267,9 +1266,9 @@ Shader "LCBDshader/Face"
 				float3 ase_worldNormal = i.ase_texcoord2.xyz;
 				float dotResult505 = dot( ( ( -1.0 * localv_bias502 * _RimVerticalOffset2 ) + ( ( 1.0 - abs( _RimVerticalOffset2 ) ) * ( ( -1.0 * localh_bias510 * _RimHorizonOffset2 ) + ( ( 1.0 - abs( _RimHorizonOffset2 ) ) * ase_worldViewDir ) ) ) ) , ase_worldNormal );
 				float rimoffset_Facing2513 = dotResult505;
-				float2 uv_CtrlTex = i.ase_texcoord3.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
-				float4 tex2DNode67 = tex2D( _CtrlTex, uv_CtrlTex );
-				float RimMask355 = tex2DNode67.b;
+				float2 uv_BaseTex = i.ase_texcoord3.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
+				float4 tex2DNode66 = tex2D( _BaseTex, uv_BaseTex );
+				float RimMask355 = tex2DNode66.b;
 				float dis_rim360 = ( (( _Use_DisRimMask )?( ( RimMask355 - 0.5 ) ):( 0.0 )) + 0.5 );
 				float RimStrength2462 = ( _RimColor2.a * pow( saturate( ( ( _RimStep2 - rimoffset_Facing2513 ) / _RimFeather2 ) ) , 3.0 ) * dis_rim360 );
 				float localIsThereALight797 = IsThereALight797();
@@ -1306,8 +1305,6 @@ Shader "LCBDshader/Face"
 				float dotResult129 = dot( ase_worldViewDir , fixed_worldnormal928 );
 				float Facing136 = dotResult129;
 				float fixed_specpower623 = exp2( ( ( _SpecularPower * -10.0 ) + 11.0 ) );
-				float2 uv_BaseTex = i.ase_texcoord3.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
-				float4 tex2DNode66 = tex2D( _BaseTex, uv_BaseTex );
 				float SpecularMask1358 = tex2DNode66.g;
 				float SpecularPower438 = ( min( pow( max( Facing136 , 0.0 ) , ( ( fixed_specpower623 * 10.0 ) + 1.0 ) ) , 1.0 ) * SpecularMask1358 * (0.0 + (_SpecularBias - 0.0) * (100.0 - 0.0) / (10.0 - 0.0)) );
 				float3 temp_cast_1 = (_MinDirectLight).xxx;
@@ -1370,7 +1367,8 @@ Shader "LCBDshader/Face"
 				float3 viewDir1337 = ase_worldViewDir;
 				float2 localgetMatcapUVs1337 = getMatcapUVs1337( normal1337 , viewDir1337 );
 				float2 matcapUV1338 = localgetMatcapUVs1337;
-				float MetalMask350 = (( _Use_MetalMask )?( tex2DNode67.g ):( 0.0 ));
+				float2 uv_CtrlTex = i.ase_texcoord3.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
+				float MetalMask350 = (( _Use_MetalMask )?( tex2D( _CtrlTex, uv_CtrlTex ).g ):( 0.0 ));
 				float4 lerpResult532 = lerp( specshaded_diff445 , ( specshaded_diff445 * tex2D( _EnvTex, (( _EnvMatCap )?( float3( matcapUV1338 ,  0.0 ) ):( ( ( float3( float2( 1,1 ) ,  0.0 ) + normal2view521 ) * 0.5 ) )).xy ) * (0.0 + (_EnvBias - 0.0) * (100.0 - 0.0) / (10.0 - 0.0)) ) , saturate( ( (0.0 + (_EnvRate - 0.0) * (100.0 - 0.0) / (10.0 - 0.0)) * MetalMask350 ) ));
 				float4 EnvSpecShaded_diff542 = lerpResult532;
 				float lerpResult1064 = lerp( LambertTerm552 , ( LambertTerm552 * RimAtten1057 ) , _RimAttenuation);
@@ -1470,8 +1468,8 @@ Shader "LCBDshader/Face"
 			uniform float _RimHorizonOffset2;
 			uniform float _RimFeather2;
 			uniform float _Use_DisRimMask;
-			uniform sampler2D _CtrlTex;
-			uniform float4 _CtrlTex_ST;
+			uniform sampler2D _BaseTex;
+			uniform float4 _BaseTex_ST;
 			uniform float _NormalRemap;
 			uniform sampler2D _BumpMap;
 			uniform float4 _BumpMap_ST;
@@ -1482,8 +1480,6 @@ Shader "LCBDshader/Face"
 			uniform float _RimAttenuation3;
 			uniform float _RimShadowRate2;
 			uniform float _SpecularPower;
-			uniform sampler2D _BaseTex;
-			uniform float4 _BaseTex_ST;
 			uniform float _SpecularBias;
 			uniform float _NoShadowinDirectionalLightColor;
 			uniform float _MinDirectLight;
@@ -1512,6 +1508,8 @@ Shader "LCBDshader/Face"
 			uniform float _EnvBias;
 			uniform float _EnvRate;
 			uniform float _Use_MetalMask;
+			uniform sampler2D _CtrlTex;
+			uniform float4 _CtrlTex_ST;
 			uniform float _RimAttenuation;
 			uniform float _RimShadowRate;
 			uniform float4 _RimColor;
@@ -1731,9 +1729,9 @@ Shader "LCBDshader/Face"
 				float3 ase_worldNormal = i.ase_texcoord2.xyz;
 				float dotResult505 = dot( ( ( -1.0 * localv_bias502 * _RimVerticalOffset2 ) + ( ( 1.0 - abs( _RimVerticalOffset2 ) ) * ( ( -1.0 * localh_bias510 * _RimHorizonOffset2 ) + ( ( 1.0 - abs( _RimHorizonOffset2 ) ) * ase_worldViewDir ) ) ) ) , ase_worldNormal );
 				float rimoffset_Facing2513 = dotResult505;
-				float2 uv_CtrlTex = i.ase_texcoord3.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
-				float4 tex2DNode67 = tex2D( _CtrlTex, uv_CtrlTex );
-				float RimMask355 = tex2DNode67.b;
+				float2 uv_BaseTex = i.ase_texcoord3.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
+				float4 tex2DNode66 = tex2D( _BaseTex, uv_BaseTex );
+				float RimMask355 = tex2DNode66.b;
 				float dis_rim360 = ( (( _Use_DisRimMask )?( ( RimMask355 - 0.5 ) ):( 0.0 )) + 0.5 );
 				float RimStrength2462 = ( _RimColor2.a * pow( saturate( ( ( _RimStep2 - rimoffset_Facing2513 ) / _RimFeather2 ) ) , 3.0 ) * dis_rim360 );
 				float localIsThereALight797 = IsThereALight797();
@@ -1770,8 +1768,6 @@ Shader "LCBDshader/Face"
 				float dotResult129 = dot( ase_worldViewDir , fixed_worldnormal928 );
 				float Facing136 = dotResult129;
 				float fixed_specpower623 = exp2( ( ( _SpecularPower * -10.0 ) + 11.0 ) );
-				float2 uv_BaseTex = i.ase_texcoord3.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
-				float4 tex2DNode66 = tex2D( _BaseTex, uv_BaseTex );
 				float SpecularMask1358 = tex2DNode66.g;
 				float SpecularPower438 = ( min( pow( max( Facing136 , 0.0 ) , ( ( fixed_specpower623 * 10.0 ) + 1.0 ) ) , 1.0 ) * SpecularMask1358 * (0.0 + (_SpecularBias - 0.0) * (100.0 - 0.0) / (10.0 - 0.0)) );
 				float3 temp_cast_1 = (_MinDirectLight).xxx;
@@ -1834,7 +1830,8 @@ Shader "LCBDshader/Face"
 				float3 viewDir1337 = ase_worldViewDir;
 				float2 localgetMatcapUVs1337 = getMatcapUVs1337( normal1337 , viewDir1337 );
 				float2 matcapUV1338 = localgetMatcapUVs1337;
-				float MetalMask350 = (( _Use_MetalMask )?( tex2DNode67.g ):( 0.0 ));
+				float2 uv_CtrlTex = i.ase_texcoord3.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
+				float MetalMask350 = (( _Use_MetalMask )?( tex2D( _CtrlTex, uv_CtrlTex ).g ):( 0.0 ));
 				float4 lerpResult532 = lerp( specshaded_diff445 , ( specshaded_diff445 * tex2D( _EnvTex, (( _EnvMatCap )?( float3( matcapUV1338 ,  0.0 ) ):( ( ( float3( float2( 1,1 ) ,  0.0 ) + normal2view521 ) * 0.5 ) )).xy ) * (0.0 + (_EnvBias - 0.0) * (100.0 - 0.0) / (10.0 - 0.0)) ) , saturate( ( (0.0 + (_EnvRate - 0.0) * (100.0 - 0.0) / (10.0 - 0.0)) * MetalMask350 ) ));
 				float4 EnvSpecShaded_diff542 = lerpResult532;
 				float lerpResult1064 = lerp( LambertTerm552 , ( LambertTerm552 * RimAtten1057 ) , _RimAttenuation);
@@ -2307,7 +2304,6 @@ Node;AmplifyShaderEditor.RangedFloatNode;451;-2481.466,-139.2925;Inherit;False;C
 Node;AmplifyShaderEditor.GetLocalVarNode;527;-2681.969,-134.5327;Inherit;False;521;normal2view;1;0;OBJECT;;False;1;FLOAT3;0
 Node;AmplifyShaderEditor.RegisterLocalVarNode;600;-2803.353,-1902.347;Inherit;False;Emissive;-1;True;1;0;COLOR;0,0,0,0;False;1;COLOR;0
 Node;AmplifyShaderEditor.RegisterLocalVarNode;350;-2599.556,-2120.494;Inherit;False;MetalMask;-1;True;1;0;FLOAT;0;False;1;FLOAT;0
-Node;AmplifyShaderEditor.RegisterLocalVarNode;355;-2792.936,-2003.397;Inherit;False;RimMask;-1;True;1;0;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.ToggleSwitchNode;559;-2809.702,-2123.636;Inherit;False;Property;_Use_MetalMask;Use_MetalMask;38;0;Create;True;0;0;0;False;1;Header(Metal);False;1;True;2;0;FLOAT;0;False;1;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.RegisterLocalVarNode;957;-2797.9,-1677.937;Inherit;False;DynEmi;-1;True;1;0;COLOR;0,0,0,0;False;1;COLOR;0
 Node;AmplifyShaderEditor.RegisterLocalVarNode;958;-2791.905,-1476.35;Inherit;False;DynEmiMask;-1;True;1;0;COLOR;0,0,0,0;False;1;COLOR;0
@@ -2377,6 +2373,7 @@ Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;949;1072.511,2383.511;Float
 Node;AmplifyShaderEditor.RegisterLocalVarNode;339;-1024.823,-2876.677;Inherit;False;shad_lerp;-1;True;1;0;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.RegisterLocalVarNode;1265;-1281.301,-2983.649;Inherit;False;SDFstep;-1;True;1;0;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.GetLocalVarNode;533;-1501.916,-334.3033;Inherit;False;445;specshaded_diff;1;0;OBJECT;;False;1;COLOR;0
+Node;AmplifyShaderEditor.RegisterLocalVarNode;355;-2787.936,-2221.397;Inherit;False;RimMask;-1;True;1;0;FLOAT;0;False;1;FLOAT;0
 WireConnection;432;0;624;0
 WireConnection;433;0;432;0
 WireConnection;428;0;429;0
@@ -2790,7 +2787,6 @@ WireConnection;450;0;449;0
 WireConnection;450;1;451;0
 WireConnection;600;0;68;0
 WireConnection;350;0;559;0
-WireConnection;355;0;67;3
 WireConnection;559;1;67;2
 WireConnection;957;0;959;0
 WireConnection;958;0;960;0
@@ -2843,5 +2839,6 @@ WireConnection;873;0;872;0
 WireConnection;949;0;618;0
 WireConnection;339;0;338;0
 WireConnection;1265;0;335;0
+WireConnection;355;0;66;3
 ASEEND*/
-//CHKSM=E4C4CE96DD1D51D43E7B8D5E30B2D129F2DC4072
+//CHKSM=E298406EF859C6AA5089818EE6F1560D8961F5D2
