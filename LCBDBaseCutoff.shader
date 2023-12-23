@@ -1,4 +1,4 @@
-// Made with Amplify Shader Editor v1.9.1.7
+// Made with Amplify Shader Editor v1.9.2
 // Available at the Unity Asset Store - http://u3d.as/y3X 
 Shader "LCBDshader/BaseCutoff"
 {
@@ -150,8 +150,7 @@ Shader "LCBDshader/BaseCutoff"
 			}
 
 			CGPROGRAM
-			#pragma multi_compile_fwdbase
-
+			
 			#pragma vertex vert
 			#pragma fragment frag
 			#pragma multi_compile_fwdbase
@@ -177,9 +176,6 @@ Shader "LCBDshader/BaseCutoff"
 			#define ASE_NEEDS_VERT_NORMAL
 			#define ASE_NEEDS_VERT_POSITION
 			#define ASE_NEEDS_FRAG_WORLD_POSITION
-			#define ASE_NEEDS_VERT_TEXTURE_COORDINATES1
-			#define ASE_NEEDS_VERT_TEXTURE_COORDINATES2
-			#define ASE_NEEDS_FRAG_WORLD_NORMAL
 
 			struct appdata {
 				float4 vertex : POSITION;
@@ -213,8 +209,6 @@ Shader "LCBDshader/BaseCutoff"
 				float4 tSpace1 : TEXCOORD6;
 				float4 tSpace2 : TEXCOORD7;
 				float4 ase_texcoord8 : TEXCOORD8;
-				float4 ase_lmap : TEXCOORD9;
-				float4 ase_sh : TEXCOORD10;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
@@ -300,6 +294,11 @@ Shader "LCBDshader/BaseCutoff"
 				#endif
 			}
 			
+			float3 ShadeSH9out( half4 Normal )
+			{
+				return ShadeSH9(Normal);
+			}
+			
 			float3 MaxShadeSH9(  )
 			{
 				return max(ShadeSH9(half4(0, 0, 0, 1)).rgb, ShadeSH9(half4(0, -1, 0, 1)).rgb);
@@ -320,31 +319,10 @@ Shader "LCBDshader/BaseCutoff"
 				ase_worldViewDir = normalize(ase_worldViewDir);
 				float4 transform748 = mul(unity_WorldToObject,float4( ase_worldViewDir , 0.0 ));
 				
-				#ifdef DYNAMICLIGHTMAP_ON //dynlm
-				o.ase_lmap.zw = v.texcoord2.xyzw.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
-				#endif //dynlm
-				#ifdef LIGHTMAP_ON //stalm
-				o.ase_lmap.xy = v.texcoord1.xyzw.xy * unity_LightmapST.xy + unity_LightmapST.zw;
-				#endif //stalm
-				float3 ase_worldNormal = UnityObjectToWorldNormal(v.normal);
-				#ifndef LIGHTMAP_ON //nstalm
-				#if UNITY_SHOULD_SAMPLE_SH //sh
-				o.ase_sh.xyz = 0;
-				#ifdef VERTEXLIGHT_ON //vl
-				o.ase_sh.xyz += Shade4PointLights (
-				unity_4LightPosX0, unity_4LightPosY0, unity_4LightPosZ0,
-				unity_LightColor[0].rgb, unity_LightColor[1].rgb, unity_LightColor[2].rgb, unity_LightColor[3].rgb,
-				unity_4LightAtten0, ase_worldPos, ase_worldNormal);
-				#endif //vl
-				o.ase_sh.xyz = ShadeSHPerVertex (ase_worldNormal, o.ase_sh.xyz);
-				#endif //sh
-				#endif //nstalm
-				
 				o.ase_texcoord8.xy = v.ase_texcoord.xy;
 				
 				//setting value to unused interpolator channels and avoid initialization warnings
 				o.ase_texcoord8.zw = 0;
-				o.ase_sh.w = 0;
 				#ifdef ASE_ABSOLUTE_VERTEX_POS
 					float3 defaultVertexValue = v.vertex.xyz;
 				#else
@@ -514,34 +492,31 @@ Shader "LCBDshader/BaseCutoff"
 				float4 ase_lightColor = _LightColor0;
 				#endif //aselc
 				float3 temp_cast_0 = (_MinDirectLight).xxx;
-				float3 clampResult1037 = clamp( ase_lightColor.rgb , temp_cast_0 , float3( 2,2,2 ) );
+				float3 temp_output_1077_0 = max( ase_lightColor.rgb , temp_cast_0 );
 				float3 worldPos985 = worldPos;
 				float localPureLightAttenuation985 = PureLightAttenuation( worldPos985 );
-				float3 temp_output_313_0 = ( clampResult1037 * (( _ShadowinLightColor )?( float4(atten,0,0,0) ):( localPureLightAttenuation985 )) );
+				float3 temp_output_313_0 = ( temp_output_1077_0 * (( _ShadowinLightColor )?( float4(atten,0,0,0) ):( localPureLightAttenuation985 )) );
+				float3 temp_cast_1 = (_MinDirectLight).xxx;
+				float3 temp_cast_2 = (_MinDirectLight).xxx;
 				#ifdef UNITY_PASS_FORWARDADD
 				float3 staticSwitch998 = temp_output_313_0;
 				#else
-				float3 staticSwitch998 = clampResult1037;
+				float3 staticSwitch998 = temp_output_1077_0;
 				#endif
-				float3 temp_cast_1 = (_MaxDirectLight).xxx;
-				float3 clampResult980 = clamp( (( _NoShadowinDirectionalLightColor )?( staticSwitch998 ):( temp_output_313_0 )) , float3( 0,0,0 ) , temp_cast_1 );
-				UnityGIInput data877;
-				UNITY_INITIALIZE_OUTPUT( UnityGIInput, data877 );
-				#if defined(LIGHTMAP_ON) || defined(DYNAMICLIGHTMAP_ON) //dylm877
-				data877.lightmapUV = IN.ase_lmap;
-				#endif //dylm877
-				#if UNITY_SHOULD_SAMPLE_SH //fsh877
-				data877.ambient = IN.ase_sh;
-				#endif //fsh877
-				UnityGI gi877 = UnityGI_Base(data877, 1, WorldNormal);
+				float3 temp_cast_3 = (_MaxDirectLight).xxx;
+				float4 Normal1076 = float4( 0,0,0,0 );
+				float3 localShadeSH9out1076 = ShadeSH9out( Normal1076 );
 				float3 localMaxShadeSH9878 = MaxShadeSH9();
-				float3 temp_cast_2 = (_MinIndirectLight).xxx;
-				float3 temp_cast_3 = (_MaxIndirectLight).xxx;
-				float3 clampResult981 = clamp( (( _UnifyIndirectDiffuseLight )?( localMaxShadeSH9878 ):( gi877.indirect.diffuse )) , temp_cast_2 , temp_cast_3 );
-				float3 temp_output_964_0 = max( clampResult980 , clampResult981 );
+				float3 temp_cast_4 = (_MinIndirectLight).xxx;
+				float3 temp_cast_5 = (_MaxIndirectLight).xxx;
+				float3 temp_output_964_0 = max( min( (( _NoShadowinDirectionalLightColor )?( staticSwitch998 ):( temp_output_313_0 )) , temp_cast_3 ) , min( max( (( _UnifyIndirectDiffuseLight )?( localMaxShadeSH9878 ):( localShadeSH9out1076 )) , temp_cast_4 ) , temp_cast_5 ) );
+				float3 temp_cast_6 = (_MinDirectLight).xxx;
+				float3 temp_cast_7 = (_MaxDirectLight).xxx;
+				float3 temp_cast_8 = (_MinIndirectLight).xxx;
+				float3 temp_cast_9 = (_MaxIndirectLight).xxx;
 				float grayscale1020 = dot(temp_output_964_0, float3(0.299,0.587,0.114));
-				float3 temp_cast_4 = (grayscale1020).xxx;
-				float3 lerpResult1019 = lerp( temp_output_964_0 , temp_cast_4 , _LightColorGrayScale);
+				float3 temp_cast_10 = (grayscale1020).xxx;
+				float3 lerpResult1019 = lerp( temp_output_964_0 , temp_cast_10 , _LightColorGrayScale);
 				float3 LightColor208 = lerpResult1019;
 				float Alpha646 = tex2DNode64.a;
 				clip( (( _Outline )?( ( Alpha646 * ( 1.0 - tex2DNode1064.a ) ) ):( 0.0 )) - _OutlineClip);
@@ -592,8 +567,7 @@ Shader "LCBDshader/BaseCutoff"
 				ZFail [_StencilZFailFront]
 			}
 			CGPROGRAM
-			#pragma multi_compile_fwdbase
-
+			
 			#pragma vertex vert
 			#pragma fragment frag
 			#pragma multi_compile_fwdbase
@@ -745,6 +719,11 @@ Shader "LCBDshader/BaseCutoff"
 				#endif
 			}
 			
+			float3 ShadeSH9out( half4 Normal )
+			{
+				return ShadeSH9(Normal);
+			}
+			
 			float3 MaxShadeSH9(  )
 			{
 				return max(ShadeSH9(half4(0, 0, 0, 1)).rgb, ShadeSH9(half4(0, -1, 0, 1)).rgb);
@@ -790,8 +769,6 @@ Shader "LCBDshader/BaseCutoff"
 				float4 vertex : POSITION;
 				float3 normal : NORMAL;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
-				float4 texcoord1 : TEXCOORD1;
-				float4 texcoord2 : TEXCOORD2;
 				float4 ase_texcoord : TEXCOORD0;
 				float4 ase_tangent : TANGENT;
 				float4 ase_color : COLOR;
@@ -804,12 +781,10 @@ Shader "LCBDshader/BaseCutoff"
 				UNITY_VERTEX_OUTPUT_STEREO
 				float4 ase_texcoord1 : TEXCOORD1;
 				UNITY_SHADOW_COORDS(2)
-				float4 ase_lmap : TEXCOORD3;
-				float4 ase_sh : TEXCOORD4;
+				float4 ase_texcoord3 : TEXCOORD3;
+				float4 ase_texcoord4 : TEXCOORD4;
 				float4 ase_texcoord5 : TEXCOORD5;
 				float4 ase_texcoord6 : TEXCOORD6;
-				float4 ase_texcoord7 : TEXCOORD7;
-				float4 ase_texcoord8 : TEXCOORD8;
 			};
 			
 			v2f vert ( appdata v )
@@ -822,42 +797,23 @@ Shader "LCBDshader/BaseCutoff"
 				
 				float3 ase_worldPos = mul(unity_ObjectToWorld, float4( (v.vertex).xyz, 1 )).xyz;
 				o.ase_texcoord1.xyz = ase_worldPos;
-				#ifdef DYNAMICLIGHTMAP_ON //dynlm
-				o.ase_lmap.zw = v.texcoord2.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
-				#endif //dynlm
-				#ifdef LIGHTMAP_ON //stalm
-				o.ase_lmap.xy = v.texcoord1.xy * unity_LightmapST.xy + unity_LightmapST.zw;
-				#endif //stalm
-				float3 ase_worldNormal = UnityObjectToWorldNormal(v.normal);
-				#ifndef LIGHTMAP_ON //nstalm
-				#if UNITY_SHOULD_SAMPLE_SH //sh
-				o.ase_sh.xyz = 0;
-				#ifdef VERTEXLIGHT_ON //vl
-				o.ase_sh.xyz += Shade4PointLights (
-				unity_4LightPosX0, unity_4LightPosY0, unity_4LightPosZ0,
-				unity_LightColor[0].rgb, unity_LightColor[1].rgb, unity_LightColor[2].rgb, unity_LightColor[3].rgb,
-				unity_4LightAtten0, ase_worldPos, ase_worldNormal);
-				#endif //vl
-				o.ase_sh.xyz = ShadeSHPerVertex (ase_worldNormal, o.ase_sh.xyz);
-				#endif //sh
-				#endif //nstalm
-				o.ase_texcoord5.xyz = ase_worldNormal;
 				float3 ase_worldTangent = UnityObjectToWorldDir(v.ase_tangent);
-				o.ase_texcoord7.xyz = ase_worldTangent;
+				o.ase_texcoord4.xyz = ase_worldTangent;
+				float3 ase_worldNormal = UnityObjectToWorldNormal(v.normal);
+				o.ase_texcoord5.xyz = ase_worldNormal;
 				float ase_vertexTangentSign = v.ase_tangent.w * ( unity_WorldTransformParams.w >= 0.0 ? 1.0 : -1.0 );
 				float3 ase_worldBitangent = cross( ase_worldNormal, ase_worldTangent ) * ase_vertexTangentSign;
-				o.ase_texcoord8.xyz = ase_worldBitangent;
+				o.ase_texcoord6.xyz = ase_worldBitangent;
 				float vertexToFrag1041 = v.ase_color.a;
 				o.ase_texcoord1.w = vertexToFrag1041;
 				
-				o.ase_texcoord6.xy = v.ase_texcoord.xy;
+				o.ase_texcoord3.xy = v.ase_texcoord.xy;
 				
 				//setting value to unused interpolator channels and avoid initialization warnings
-				o.ase_sh.w = 0;
+				o.ase_texcoord3.zw = 0;
+				o.ase_texcoord4.w = 0;
 				o.ase_texcoord5.w = 0;
-				o.ase_texcoord6.zw = 0;
-				o.ase_texcoord7.w = 0;
-				o.ase_texcoord8.w = 0;
+				o.ase_texcoord6.w = 0;
 				
 				v.vertex.xyz +=  float3(0,0,0) ;
 				o.pos = UnityObjectToClipPos(v.vertex);
@@ -882,41 +838,37 @@ Shader "LCBDshader/BaseCutoff"
 				float4 ase_lightColor = _LightColor0;
 				#endif //aselc
 				float3 temp_cast_0 = (_MinDirectLight).xxx;
-				float3 clampResult1037 = clamp( ase_lightColor.rgb , temp_cast_0 , float3( 2,2,2 ) );
+				float3 temp_output_1077_0 = max( ase_lightColor.rgb , temp_cast_0 );
 				float3 ase_worldPos = i.ase_texcoord1.xyz;
 				float3 worldPos985 = ase_worldPos;
 				float localPureLightAttenuation985 = PureLightAttenuation( worldPos985 );
 				UNITY_LIGHT_ATTENUATION(ase_atten, i, ase_worldPos)
-				float3 temp_output_313_0 = ( clampResult1037 * (( _ShadowinLightColor )?( ase_atten ):( localPureLightAttenuation985 )) );
+				float3 temp_output_313_0 = ( temp_output_1077_0 * (( _ShadowinLightColor )?( ase_atten ):( localPureLightAttenuation985 )) );
+				float3 temp_cast_1 = (_MinDirectLight).xxx;
+				float3 temp_cast_2 = (_MinDirectLight).xxx;
 				#ifdef UNITY_PASS_FORWARDADD
 				float3 staticSwitch998 = temp_output_313_0;
 				#else
-				float3 staticSwitch998 = clampResult1037;
+				float3 staticSwitch998 = temp_output_1077_0;
 				#endif
-				float3 temp_cast_1 = (_MaxDirectLight).xxx;
-				float3 clampResult980 = clamp( (( _NoShadowinDirectionalLightColor )?( staticSwitch998 ):( temp_output_313_0 )) , float3( 0,0,0 ) , temp_cast_1 );
-				float3 ase_worldNormal = i.ase_texcoord5.xyz;
-				UnityGIInput data877;
-				UNITY_INITIALIZE_OUTPUT( UnityGIInput, data877 );
-				#if defined(LIGHTMAP_ON) || defined(DYNAMICLIGHTMAP_ON) //dylm877
-				data877.lightmapUV = i.ase_lmap;
-				#endif //dylm877
-				#if UNITY_SHOULD_SAMPLE_SH //fsh877
-				data877.ambient = i.ase_sh;
-				#endif //fsh877
-				UnityGI gi877 = UnityGI_Base(data877, 1, ase_worldNormal);
+				float3 temp_cast_3 = (_MaxDirectLight).xxx;
+				float4 Normal1076 = float4( 0,0,0,0 );
+				float3 localShadeSH9out1076 = ShadeSH9out( Normal1076 );
 				float3 localMaxShadeSH9878 = MaxShadeSH9();
-				float3 temp_cast_2 = (_MinIndirectLight).xxx;
-				float3 temp_cast_3 = (_MaxIndirectLight).xxx;
-				float3 clampResult981 = clamp( (( _UnifyIndirectDiffuseLight )?( localMaxShadeSH9878 ):( gi877.indirect.diffuse )) , temp_cast_2 , temp_cast_3 );
-				float3 temp_output_964_0 = max( clampResult980 , clampResult981 );
+				float3 temp_cast_4 = (_MinIndirectLight).xxx;
+				float3 temp_cast_5 = (_MaxIndirectLight).xxx;
+				float3 temp_output_964_0 = max( min( (( _NoShadowinDirectionalLightColor )?( staticSwitch998 ):( temp_output_313_0 )) , temp_cast_3 ) , min( max( (( _UnifyIndirectDiffuseLight )?( localMaxShadeSH9878 ):( localShadeSH9out1076 )) , temp_cast_4 ) , temp_cast_5 ) );
+				float3 temp_cast_6 = (_MinDirectLight).xxx;
+				float3 temp_cast_7 = (_MaxDirectLight).xxx;
+				float3 temp_cast_8 = (_MinIndirectLight).xxx;
+				float3 temp_cast_9 = (_MaxIndirectLight).xxx;
 				float grayscale1020 = dot(temp_output_964_0, float3(0.299,0.587,0.114));
-				float3 temp_cast_4 = (grayscale1020).xxx;
-				float3 lerpResult1019 = lerp( temp_output_964_0 , temp_cast_4 , _LightColorGrayScale);
+				float3 temp_cast_10 = (grayscale1020).xxx;
+				float3 lerpResult1019 = lerp( temp_output_964_0 , temp_cast_10 , _LightColorGrayScale);
 				float3 LightColor208 = lerpResult1019;
 				float4 lerpResult1014 = lerp( float4( LightColor208 , 0.0 ) , _GlobalRimColor , _CustomRimLightColor);
-				float4 temp_cast_6 = (_MinRimLightColor).xxxx;
-				float4 clampResult1015 = clamp( lerpResult1014 , temp_cast_6 , float4( 1,1,1,0 ) );
+				float4 temp_cast_12 = (_MinRimLightColor).xxxx;
+				float4 clampResult1015 = clamp( lerpResult1014 , temp_cast_12 , float4( 1,1,1,0 ) );
 				float4 SpecularColor539 = _SpecularColor;
 				float4 RimColor2541 = _RimColor2;
 				float4 lerpResult543 = lerp( SpecularColor539 , RimColor2541 , _RimSpecRate2);
@@ -924,9 +876,10 @@ Shader "LCBDshader/BaseCutoff"
 				float3 localh_bias510 = h_bias();
 				float3 ase_worldViewDir = UnityWorldSpaceViewDir(ase_worldPos);
 				ase_worldViewDir = normalize(ase_worldViewDir);
-				float2 uv_BumpMap = i.ase_texcoord6.xy * _BumpMap_ST.xy + _BumpMap_ST.zw;
-				float3 ase_worldTangent = i.ase_texcoord7.xyz;
-				float3 ase_worldBitangent = i.ase_texcoord8.xyz;
+				float2 uv_BumpMap = i.ase_texcoord3.xy * _BumpMap_ST.xy + _BumpMap_ST.zw;
+				float3 ase_worldTangent = i.ase_texcoord4.xyz;
+				float3 ase_worldNormal = i.ase_texcoord5.xyz;
+				float3 ase_worldBitangent = i.ase_texcoord6.xyz;
 				float3 tanToWorld0 = float3( ase_worldTangent.x, ase_worldBitangent.x, ase_worldNormal.x );
 				float3 tanToWorld1 = float3( ase_worldTangent.y, ase_worldBitangent.y, ase_worldNormal.y );
 				float3 tanToWorld2 = float3( ase_worldTangent.z, ase_worldBitangent.z, ase_worldNormal.z );
@@ -935,7 +888,7 @@ Shader "LCBDshader/BaseCutoff"
 				float3 WorldNormal1054 = worldNormal1053;
 				float dotResult505 = dot( ( ( -1.0 * localv_bias502 * _RimVerticalOffset2 ) + ( ( 1.0 - abs( _RimVerticalOffset2 ) ) * ( ( -1.0 * localh_bias510 * _RimHorizonOffset2 ) + ( ( 1.0 - abs( _RimHorizonOffset2 ) ) * ase_worldViewDir ) ) ) ) , WorldNormal1054 );
 				float rimoffset_Facing2513 = dotResult505;
-				float2 uv_BaseTex = i.ase_texcoord6.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
+				float2 uv_BaseTex = i.ase_texcoord3.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
 				float4 tex2DNode66 = tex2D( _BaseTex, uv_BaseTex );
 				float RimMask355 = tex2DNode66.b;
 				float dis_rim360 = ( (( _Use_DisRimMask )?( ( RimMask355 - 0.5 ) ):( 0.0 )) + 0.5 );
@@ -957,14 +910,14 @@ Shader "LCBDshader/BaseCutoff"
 				float4 lerpResult973 = lerp( ( _SpecularColor * SpecularPower438 ) , ( _SpecularColor * SpecularPower438 * float4( LightColor208 , 0.0 ) ) , GlobalLightFactor966);
 				float vertexToFrag1041 = i.ase_texcoord1.w;
 				float VertexColorShadowMask648 = (( _UseShadowMaskVertexColorA )?( vertexToFrag1041 ):( 1.0 ));
-				float2 uv_MainTex = i.ase_texcoord6.xy * _MainTex_ST.xy + _MainTex_ST.zw;
+				float2 uv_MainTex = i.ase_texcoord3.xy * _MainTex_ST.xy + _MainTex_ST.zw;
 				float4 tex2DNode64 = tex2D( _MainTex, uv_MainTex );
 				float4 diff345 = tex2DNode64;
 				float DiffuseLightFactor1035 = _DiffuseLightFactor;
 				float4 lerpResult969 = lerp( diff345 , ( diff345 * float4( LightColor208 , 0.0 ) ) , DiffuseLightFactor1035);
 				float4 lit_diff349 = lerpResult969;
 				float4 toon_diff370 = ( (( _UseShadowMaskVertexColorA )?( vertexToFrag1041 ):( 1.0 )) == 1.0 ? ( 0.5 >= _ToonBrightColor.a ? ( _ToonBrightColor * lit_diff349 ) : ( _ToonBrightColor + lit_diff349 ) ) : lit_diff349 );
-				float2 uv_ShadTex = i.ase_texcoord6.xy * _ShadTex_ST.xy + _ShadTex_ST.zw;
+				float2 uv_ShadTex = i.ase_texcoord3.xy * _ShadTex_ST.xy + _ShadTex_ST.zw;
 				float4 shad_c330 = tex2D( _ShadTex, uv_ShadTex );
 				float4 lerpResult968 = lerp( ( shad_c330 * _GlobalShadowColor ) , ( shad_c330 * _GlobalShadowColor * float4( LightColor208 , 0.0 ) ) , DiffuseLightFactor1035);
 				float4 lit_shad344 = lerpResult968;
@@ -988,7 +941,7 @@ Shader "LCBDshader/BaseCutoff"
 				float4 tex2DNode958 = tex2D( _RflTex, ( ( float3( float2( 1,1 ) ,  0.0 ) + normal2view521 ) * 0.5 ).xy );
 				float4 RflMul943 = ( ( tex2DNode958.g * ( _RflMulBias * 10 ) * _ReflectionMulColor ) + _RflMulOffset );
 				float RflAdd938 = ( _RflAddBias * 10.0 * pow( tex2DNode958.r , _RflAddPowVal ) );
-				float2 uv_CtrlTex = i.ase_texcoord6.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
+				float2 uv_CtrlTex = i.ase_texcoord3.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
 				float ReflectionMask927 = (( _Use_ReflectionMask )?( tex2D( _CtrlTex, uv_CtrlTex ).r ):( 0.0 ));
 				float4 lerpResult940 = lerp( EnvSpecShaded_diff542 , ( ( EnvSpecShaded_diff542 * RflMul943 ) + ( RflAdd938 * _ReflectionAddColor ) ) , saturate( ( _RflRate * ReflectionMask927 ) ));
 				float4 Env2SpecShaded_diff939 = lerpResult940;
@@ -1005,25 +958,25 @@ Shader "LCBDshader/BaseCutoff"
 				float4 Rim2EnvSpecShaded_diff577 = ( ( clampResult1015 * ( lerpResult543 * RimStrength2462 ) * ( saturate( lerpResult1010 ) + _RimShadowRate2 ) ) + RimEnvSpecShaded_diff562 );
 				float4 realRim578 = temp_output_563_0;
 				float4 break592 = realRim578;
-				float2 uv_DirtTex = i.ase_texcoord6.xy * _DirtTex_ST.xy + _DirtTex_ST.zw;
+				float2 uv_DirtTex = i.ase_texcoord3.xy * _DirtTex_ST.xy + _DirtTex_ST.zw;
 				float4 dirt620 = tex2D( _DirtTex, uv_DirtTex );
 				float4 break582 = ( dirt620 * _DirtScale );
 				float DirtPower590 = ( ( _DirtRateR * break582.r ) + ( _DirtRateG * break582.g ) + ( break582.b * _DirtRateB ) );
 				float4 lerpResult597 = lerp( Rim2EnvSpecShaded_diff577 , ( 1E-05 >= ( break592.r + break592.g + break592.b ) ? _GlobalDirtColor : _GlobalDirtRimSpecularColor ) , DirtPower590);
 				float4 DirtRim2EnvSpecShaded_diff601 = lerpResult597;
 				float4 lerpResult978 = lerp( ( _CharaColor * DirtRim2EnvSpecShaded_diff601 ) , ( _CharaColor * DirtRim2EnvSpecShaded_diff601 * float4( LightColor208 , 0.0 ) ) , GlobalLightFactor966);
-				float2 uv_EmiTex = i.ase_texcoord6.xy * _EmiTex_ST.xy + _EmiTex_ST.zw;
+				float2 uv_EmiTex = i.ase_texcoord3.xy * _EmiTex_ST.xy + _EmiTex_ST.zw;
 				float4 Emissive600 = tex2D( _EmiTex, uv_EmiTex );
 				float mulTime914 = _Time.y * 0.1;
 				float2 appendResult920 = (float2(( _DynEmiScrollX * mulTime914 ) , ( mulTime914 * _DynEmiScrollY )));
-				float2 texCoord913 = i.ase_texcoord6.xy * float2( 1,1 ) + appendResult920;
+				float2 texCoord913 = i.ase_texcoord3.xy * float2( 1,1 ) + appendResult920;
 				float4 DynEmi907 = tex2D( _DynamicEmmisive_dyn_emi, texCoord913 );
-				float2 uv_DynamicEmmisiveMask_dyn_emi_mask = i.ase_texcoord6.xy * _DynamicEmmisiveMask_dyn_emi_mask_ST.xy + _DynamicEmmisiveMask_dyn_emi_mask_ST.zw;
+				float2 uv_DynamicEmmisiveMask_dyn_emi_mask = i.ase_texcoord3.xy * _DynamicEmmisiveMask_dyn_emi_mask_ST.xy + _DynamicEmmisiveMask_dyn_emi_mask_ST.zw;
 				float4 DynEmiMask908 = tex2D( _DynamicEmmisiveMask_dyn_emi_mask, uv_DynamicEmmisiveMask_dyn_emi_mask );
 				float4 Refined_diff612 = ( lerpResult978 + ( ( 1.0 - DirtPower590 ) * Emissive600 * _EmissiveColor * _EmmisiveStrength ) + ( ( 1.0 - DirtPower590 ) * DynEmi907 * DynEmiMask908 * _DynEmissiveColor * _DynEmmisiveStrength ) );
 				float dotResult614 = dot( _UnsaturationColor , Refined_diff612 );
-				float4 temp_cast_18 = (dotResult614).xxxx;
-				float4 lerpResult616 = lerp( temp_cast_18 , Refined_diff612 , _Saturation);
+				float4 temp_cast_24 = (dotResult614).xxxx;
+				float4 lerpResult616 = lerp( temp_cast_24 , Refined_diff612 , _Saturation);
 				float4 output_diff618 = lerpResult616;
 				float Alpha646 = tex2DNode64.a;
 				clip( Alpha646 - _ClipValue);
@@ -1061,8 +1014,7 @@ Shader "LCBDshader/BaseCutoff"
 				ZFail [_StencilZFailFront]
 			}
 			CGPROGRAM
-			#pragma multi_compile_fwdbase
-
+			
 			#pragma vertex vert
 			#pragma fragment frag
 			#pragma multi_compile_fwdadd_fullshadows
@@ -1214,6 +1166,11 @@ Shader "LCBDshader/BaseCutoff"
 				#endif
 			}
 			
+			float3 ShadeSH9out( half4 Normal )
+			{
+				return ShadeSH9(Normal);
+			}
+			
 			float3 MaxShadeSH9(  )
 			{
 				return max(ShadeSH9(half4(0, 0, 0, 1)).rgb, ShadeSH9(half4(0, -1, 0, 1)).rgb);
@@ -1259,8 +1216,6 @@ Shader "LCBDshader/BaseCutoff"
 				float4 vertex : POSITION;
 				float3 normal : NORMAL;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
-				float4 texcoord1 : TEXCOORD1;
-				float4 texcoord2 : TEXCOORD2;
 				float4 ase_texcoord : TEXCOORD0;
 				float4 ase_tangent : TANGENT;
 				float4 ase_color : COLOR;
@@ -1273,12 +1228,10 @@ Shader "LCBDshader/BaseCutoff"
 				UNITY_VERTEX_OUTPUT_STEREO
 				float4 ase_texcoord1 : TEXCOORD1;
 				UNITY_SHADOW_COORDS(2)
-				float4 ase_lmap : TEXCOORD3;
-				float4 ase_sh : TEXCOORD4;
+				float4 ase_texcoord3 : TEXCOORD3;
+				float4 ase_texcoord4 : TEXCOORD4;
 				float4 ase_texcoord5 : TEXCOORD5;
 				float4 ase_texcoord6 : TEXCOORD6;
-				float4 ase_texcoord7 : TEXCOORD7;
-				float4 ase_texcoord8 : TEXCOORD8;
 			};
 			
 			v2f vert ( appdata v )
@@ -1291,42 +1244,23 @@ Shader "LCBDshader/BaseCutoff"
 				
 				float3 ase_worldPos = mul(unity_ObjectToWorld, float4( (v.vertex).xyz, 1 )).xyz;
 				o.ase_texcoord1.xyz = ase_worldPos;
-				#ifdef DYNAMICLIGHTMAP_ON //dynlm
-				o.ase_lmap.zw = v.texcoord2.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
-				#endif //dynlm
-				#ifdef LIGHTMAP_ON //stalm
-				o.ase_lmap.xy = v.texcoord1.xy * unity_LightmapST.xy + unity_LightmapST.zw;
-				#endif //stalm
-				float3 ase_worldNormal = UnityObjectToWorldNormal(v.normal);
-				#ifndef LIGHTMAP_ON //nstalm
-				#if UNITY_SHOULD_SAMPLE_SH //sh
-				o.ase_sh.xyz = 0;
-				#ifdef VERTEXLIGHT_ON //vl
-				o.ase_sh.xyz += Shade4PointLights (
-				unity_4LightPosX0, unity_4LightPosY0, unity_4LightPosZ0,
-				unity_LightColor[0].rgb, unity_LightColor[1].rgb, unity_LightColor[2].rgb, unity_LightColor[3].rgb,
-				unity_4LightAtten0, ase_worldPos, ase_worldNormal);
-				#endif //vl
-				o.ase_sh.xyz = ShadeSHPerVertex (ase_worldNormal, o.ase_sh.xyz);
-				#endif //sh
-				#endif //nstalm
-				o.ase_texcoord5.xyz = ase_worldNormal;
 				float3 ase_worldTangent = UnityObjectToWorldDir(v.ase_tangent);
-				o.ase_texcoord7.xyz = ase_worldTangent;
+				o.ase_texcoord4.xyz = ase_worldTangent;
+				float3 ase_worldNormal = UnityObjectToWorldNormal(v.normal);
+				o.ase_texcoord5.xyz = ase_worldNormal;
 				float ase_vertexTangentSign = v.ase_tangent.w * ( unity_WorldTransformParams.w >= 0.0 ? 1.0 : -1.0 );
 				float3 ase_worldBitangent = cross( ase_worldNormal, ase_worldTangent ) * ase_vertexTangentSign;
-				o.ase_texcoord8.xyz = ase_worldBitangent;
+				o.ase_texcoord6.xyz = ase_worldBitangent;
 				float vertexToFrag1041 = v.ase_color.a;
 				o.ase_texcoord1.w = vertexToFrag1041;
 				
-				o.ase_texcoord6.xy = v.ase_texcoord.xy;
+				o.ase_texcoord3.xy = v.ase_texcoord.xy;
 				
 				//setting value to unused interpolator channels and avoid initialization warnings
-				o.ase_sh.w = 0;
+				o.ase_texcoord3.zw = 0;
+				o.ase_texcoord4.w = 0;
 				o.ase_texcoord5.w = 0;
-				o.ase_texcoord6.zw = 0;
-				o.ase_texcoord7.w = 0;
-				o.ase_texcoord8.w = 0;
+				o.ase_texcoord6.w = 0;
 				
 				v.vertex.xyz +=  float3(0,0,0) ;
 				o.pos = UnityObjectToClipPos(v.vertex);
@@ -1351,41 +1285,37 @@ Shader "LCBDshader/BaseCutoff"
 				float4 ase_lightColor = _LightColor0;
 				#endif //aselc
 				float3 temp_cast_0 = (_MinDirectLight).xxx;
-				float3 clampResult1037 = clamp( ase_lightColor.rgb , temp_cast_0 , float3( 2,2,2 ) );
+				float3 temp_output_1077_0 = max( ase_lightColor.rgb , temp_cast_0 );
 				float3 ase_worldPos = i.ase_texcoord1.xyz;
 				float3 worldPos985 = ase_worldPos;
 				float localPureLightAttenuation985 = PureLightAttenuation( worldPos985 );
 				UNITY_LIGHT_ATTENUATION(ase_atten, i, ase_worldPos)
-				float3 temp_output_313_0 = ( clampResult1037 * (( _ShadowinLightColor )?( ase_atten ):( localPureLightAttenuation985 )) );
+				float3 temp_output_313_0 = ( temp_output_1077_0 * (( _ShadowinLightColor )?( ase_atten ):( localPureLightAttenuation985 )) );
+				float3 temp_cast_1 = (_MinDirectLight).xxx;
+				float3 temp_cast_2 = (_MinDirectLight).xxx;
 				#ifdef UNITY_PASS_FORWARDADD
 				float3 staticSwitch998 = temp_output_313_0;
 				#else
-				float3 staticSwitch998 = clampResult1037;
+				float3 staticSwitch998 = temp_output_1077_0;
 				#endif
-				float3 temp_cast_1 = (_MaxDirectLight).xxx;
-				float3 clampResult980 = clamp( (( _NoShadowinDirectionalLightColor )?( staticSwitch998 ):( temp_output_313_0 )) , float3( 0,0,0 ) , temp_cast_1 );
-				float3 ase_worldNormal = i.ase_texcoord5.xyz;
-				UnityGIInput data877;
-				UNITY_INITIALIZE_OUTPUT( UnityGIInput, data877 );
-				#if defined(LIGHTMAP_ON) || defined(DYNAMICLIGHTMAP_ON) //dylm877
-				data877.lightmapUV = i.ase_lmap;
-				#endif //dylm877
-				#if UNITY_SHOULD_SAMPLE_SH //fsh877
-				data877.ambient = i.ase_sh;
-				#endif //fsh877
-				UnityGI gi877 = UnityGI_Base(data877, 1, ase_worldNormal);
+				float3 temp_cast_3 = (_MaxDirectLight).xxx;
+				float4 Normal1076 = float4( 0,0,0,0 );
+				float3 localShadeSH9out1076 = ShadeSH9out( Normal1076 );
 				float3 localMaxShadeSH9878 = MaxShadeSH9();
-				float3 temp_cast_2 = (_MinIndirectLight).xxx;
-				float3 temp_cast_3 = (_MaxIndirectLight).xxx;
-				float3 clampResult981 = clamp( (( _UnifyIndirectDiffuseLight )?( localMaxShadeSH9878 ):( gi877.indirect.diffuse )) , temp_cast_2 , temp_cast_3 );
-				float3 temp_output_964_0 = max( clampResult980 , clampResult981 );
+				float3 temp_cast_4 = (_MinIndirectLight).xxx;
+				float3 temp_cast_5 = (_MaxIndirectLight).xxx;
+				float3 temp_output_964_0 = max( min( (( _NoShadowinDirectionalLightColor )?( staticSwitch998 ):( temp_output_313_0 )) , temp_cast_3 ) , min( max( (( _UnifyIndirectDiffuseLight )?( localMaxShadeSH9878 ):( localShadeSH9out1076 )) , temp_cast_4 ) , temp_cast_5 ) );
+				float3 temp_cast_6 = (_MinDirectLight).xxx;
+				float3 temp_cast_7 = (_MaxDirectLight).xxx;
+				float3 temp_cast_8 = (_MinIndirectLight).xxx;
+				float3 temp_cast_9 = (_MaxIndirectLight).xxx;
 				float grayscale1020 = dot(temp_output_964_0, float3(0.299,0.587,0.114));
-				float3 temp_cast_4 = (grayscale1020).xxx;
-				float3 lerpResult1019 = lerp( temp_output_964_0 , temp_cast_4 , _LightColorGrayScale);
+				float3 temp_cast_10 = (grayscale1020).xxx;
+				float3 lerpResult1019 = lerp( temp_output_964_0 , temp_cast_10 , _LightColorGrayScale);
 				float3 LightColor208 = lerpResult1019;
 				float4 lerpResult1014 = lerp( float4( LightColor208 , 0.0 ) , _GlobalRimColor , _CustomRimLightColor);
-				float4 temp_cast_6 = (_MinRimLightColor).xxxx;
-				float4 clampResult1015 = clamp( lerpResult1014 , temp_cast_6 , float4( 1,1,1,0 ) );
+				float4 temp_cast_12 = (_MinRimLightColor).xxxx;
+				float4 clampResult1015 = clamp( lerpResult1014 , temp_cast_12 , float4( 1,1,1,0 ) );
 				float4 SpecularColor539 = _SpecularColor;
 				float4 RimColor2541 = _RimColor2;
 				float4 lerpResult543 = lerp( SpecularColor539 , RimColor2541 , _RimSpecRate2);
@@ -1393,9 +1323,10 @@ Shader "LCBDshader/BaseCutoff"
 				float3 localh_bias510 = h_bias();
 				float3 ase_worldViewDir = UnityWorldSpaceViewDir(ase_worldPos);
 				ase_worldViewDir = normalize(ase_worldViewDir);
-				float2 uv_BumpMap = i.ase_texcoord6.xy * _BumpMap_ST.xy + _BumpMap_ST.zw;
-				float3 ase_worldTangent = i.ase_texcoord7.xyz;
-				float3 ase_worldBitangent = i.ase_texcoord8.xyz;
+				float2 uv_BumpMap = i.ase_texcoord3.xy * _BumpMap_ST.xy + _BumpMap_ST.zw;
+				float3 ase_worldTangent = i.ase_texcoord4.xyz;
+				float3 ase_worldNormal = i.ase_texcoord5.xyz;
+				float3 ase_worldBitangent = i.ase_texcoord6.xyz;
 				float3 tanToWorld0 = float3( ase_worldTangent.x, ase_worldBitangent.x, ase_worldNormal.x );
 				float3 tanToWorld1 = float3( ase_worldTangent.y, ase_worldBitangent.y, ase_worldNormal.y );
 				float3 tanToWorld2 = float3( ase_worldTangent.z, ase_worldBitangent.z, ase_worldNormal.z );
@@ -1404,7 +1335,7 @@ Shader "LCBDshader/BaseCutoff"
 				float3 WorldNormal1054 = worldNormal1053;
 				float dotResult505 = dot( ( ( -1.0 * localv_bias502 * _RimVerticalOffset2 ) + ( ( 1.0 - abs( _RimVerticalOffset2 ) ) * ( ( -1.0 * localh_bias510 * _RimHorizonOffset2 ) + ( ( 1.0 - abs( _RimHorizonOffset2 ) ) * ase_worldViewDir ) ) ) ) , WorldNormal1054 );
 				float rimoffset_Facing2513 = dotResult505;
-				float2 uv_BaseTex = i.ase_texcoord6.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
+				float2 uv_BaseTex = i.ase_texcoord3.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
 				float4 tex2DNode66 = tex2D( _BaseTex, uv_BaseTex );
 				float RimMask355 = tex2DNode66.b;
 				float dis_rim360 = ( (( _Use_DisRimMask )?( ( RimMask355 - 0.5 ) ):( 0.0 )) + 0.5 );
@@ -1426,14 +1357,14 @@ Shader "LCBDshader/BaseCutoff"
 				float4 lerpResult973 = lerp( ( _SpecularColor * SpecularPower438 ) , ( _SpecularColor * SpecularPower438 * float4( LightColor208 , 0.0 ) ) , GlobalLightFactor966);
 				float vertexToFrag1041 = i.ase_texcoord1.w;
 				float VertexColorShadowMask648 = (( _UseShadowMaskVertexColorA )?( vertexToFrag1041 ):( 1.0 ));
-				float2 uv_MainTex = i.ase_texcoord6.xy * _MainTex_ST.xy + _MainTex_ST.zw;
+				float2 uv_MainTex = i.ase_texcoord3.xy * _MainTex_ST.xy + _MainTex_ST.zw;
 				float4 tex2DNode64 = tex2D( _MainTex, uv_MainTex );
 				float4 diff345 = tex2DNode64;
 				float DiffuseLightFactor1035 = _DiffuseLightFactor;
 				float4 lerpResult969 = lerp( diff345 , ( diff345 * float4( LightColor208 , 0.0 ) ) , DiffuseLightFactor1035);
 				float4 lit_diff349 = lerpResult969;
 				float4 toon_diff370 = ( (( _UseShadowMaskVertexColorA )?( vertexToFrag1041 ):( 1.0 )) == 1.0 ? ( 0.5 >= _ToonBrightColor.a ? ( _ToonBrightColor * lit_diff349 ) : ( _ToonBrightColor + lit_diff349 ) ) : lit_diff349 );
-				float2 uv_ShadTex = i.ase_texcoord6.xy * _ShadTex_ST.xy + _ShadTex_ST.zw;
+				float2 uv_ShadTex = i.ase_texcoord3.xy * _ShadTex_ST.xy + _ShadTex_ST.zw;
 				float4 shad_c330 = tex2D( _ShadTex, uv_ShadTex );
 				float4 lerpResult968 = lerp( ( shad_c330 * _GlobalShadowColor ) , ( shad_c330 * _GlobalShadowColor * float4( LightColor208 , 0.0 ) ) , DiffuseLightFactor1035);
 				float4 lit_shad344 = lerpResult968;
@@ -1457,7 +1388,7 @@ Shader "LCBDshader/BaseCutoff"
 				float4 tex2DNode958 = tex2D( _RflTex, ( ( float3( float2( 1,1 ) ,  0.0 ) + normal2view521 ) * 0.5 ).xy );
 				float4 RflMul943 = ( ( tex2DNode958.g * ( _RflMulBias * 10 ) * _ReflectionMulColor ) + _RflMulOffset );
 				float RflAdd938 = ( _RflAddBias * 10.0 * pow( tex2DNode958.r , _RflAddPowVal ) );
-				float2 uv_CtrlTex = i.ase_texcoord6.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
+				float2 uv_CtrlTex = i.ase_texcoord3.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
 				float ReflectionMask927 = (( _Use_ReflectionMask )?( tex2D( _CtrlTex, uv_CtrlTex ).r ):( 0.0 ));
 				float4 lerpResult940 = lerp( EnvSpecShaded_diff542 , ( ( EnvSpecShaded_diff542 * RflMul943 ) + ( RflAdd938 * _ReflectionAddColor ) ) , saturate( ( _RflRate * ReflectionMask927 ) ));
 				float4 Env2SpecShaded_diff939 = lerpResult940;
@@ -1474,25 +1405,25 @@ Shader "LCBDshader/BaseCutoff"
 				float4 Rim2EnvSpecShaded_diff577 = ( ( clampResult1015 * ( lerpResult543 * RimStrength2462 ) * ( saturate( lerpResult1010 ) + _RimShadowRate2 ) ) + RimEnvSpecShaded_diff562 );
 				float4 realRim578 = temp_output_563_0;
 				float4 break592 = realRim578;
-				float2 uv_DirtTex = i.ase_texcoord6.xy * _DirtTex_ST.xy + _DirtTex_ST.zw;
+				float2 uv_DirtTex = i.ase_texcoord3.xy * _DirtTex_ST.xy + _DirtTex_ST.zw;
 				float4 dirt620 = tex2D( _DirtTex, uv_DirtTex );
 				float4 break582 = ( dirt620 * _DirtScale );
 				float DirtPower590 = ( ( _DirtRateR * break582.r ) + ( _DirtRateG * break582.g ) + ( break582.b * _DirtRateB ) );
 				float4 lerpResult597 = lerp( Rim2EnvSpecShaded_diff577 , ( 1E-05 >= ( break592.r + break592.g + break592.b ) ? _GlobalDirtColor : _GlobalDirtRimSpecularColor ) , DirtPower590);
 				float4 DirtRim2EnvSpecShaded_diff601 = lerpResult597;
 				float4 lerpResult978 = lerp( ( _CharaColor * DirtRim2EnvSpecShaded_diff601 ) , ( _CharaColor * DirtRim2EnvSpecShaded_diff601 * float4( LightColor208 , 0.0 ) ) , GlobalLightFactor966);
-				float2 uv_EmiTex = i.ase_texcoord6.xy * _EmiTex_ST.xy + _EmiTex_ST.zw;
+				float2 uv_EmiTex = i.ase_texcoord3.xy * _EmiTex_ST.xy + _EmiTex_ST.zw;
 				float4 Emissive600 = tex2D( _EmiTex, uv_EmiTex );
 				float mulTime914 = _Time.y * 0.1;
 				float2 appendResult920 = (float2(( _DynEmiScrollX * mulTime914 ) , ( mulTime914 * _DynEmiScrollY )));
-				float2 texCoord913 = i.ase_texcoord6.xy * float2( 1,1 ) + appendResult920;
+				float2 texCoord913 = i.ase_texcoord3.xy * float2( 1,1 ) + appendResult920;
 				float4 DynEmi907 = tex2D( _DynamicEmmisive_dyn_emi, texCoord913 );
-				float2 uv_DynamicEmmisiveMask_dyn_emi_mask = i.ase_texcoord6.xy * _DynamicEmmisiveMask_dyn_emi_mask_ST.xy + _DynamicEmmisiveMask_dyn_emi_mask_ST.zw;
+				float2 uv_DynamicEmmisiveMask_dyn_emi_mask = i.ase_texcoord3.xy * _DynamicEmmisiveMask_dyn_emi_mask_ST.xy + _DynamicEmmisiveMask_dyn_emi_mask_ST.zw;
 				float4 DynEmiMask908 = tex2D( _DynamicEmmisiveMask_dyn_emi_mask, uv_DynamicEmmisiveMask_dyn_emi_mask );
 				float4 Refined_diff612 = ( lerpResult978 + ( ( 1.0 - DirtPower590 ) * Emissive600 * _EmissiveColor * _EmmisiveStrength ) + ( ( 1.0 - DirtPower590 ) * DynEmi907 * DynEmiMask908 * _DynEmissiveColor * _DynEmmisiveStrength ) );
 				float dotResult614 = dot( _UnsaturationColor , Refined_diff612 );
-				float4 temp_cast_18 = (dotResult614).xxxx;
-				float4 lerpResult616 = lerp( temp_cast_18 , Refined_diff612 , _Saturation);
+				float4 temp_cast_24 = (dotResult614).xxxx;
+				float4 lerpResult616 = lerp( temp_cast_24 , Refined_diff612 , _Saturation);
 				float4 output_diff618 = lerpResult616;
 				float Alpha646 = tex2DNode64.a;
 				clip( Alpha646 - _ClipValue);
@@ -1514,8 +1445,7 @@ Shader "LCBDshader/BaseCutoff"
 			ZWrite On
 			ZTest LEqual
 			CGPROGRAM
-			#pragma multi_compile_fwdbase
-
+			
 			#pragma vertex vert
 			#pragma fragment frag
 			#pragma multi_compile_shadowcaster
@@ -1667,6 +1597,11 @@ Shader "LCBDshader/BaseCutoff"
 				#endif
 			}
 			
+			float3 ShadeSH9out( half4 Normal )
+			{
+				return ShadeSH9(Normal);
+			}
+			
 			float3 MaxShadeSH9(  )
 			{
 				return max(ShadeSH9(half4(0, 0, 0, 1)).rgb, ShadeSH9(half4(0, -1, 0, 1)).rgb);
@@ -1712,8 +1647,6 @@ Shader "LCBDshader/BaseCutoff"
 				float4 vertex : POSITION;
 				float3 normal : NORMAL;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
-				float4 texcoord1 : TEXCOORD1;
-				float4 texcoord2 : TEXCOORD2;
 				float4 ase_texcoord : TEXCOORD0;
 				float4 ase_tangent : TANGENT;
 				float4 ase_color : COLOR;
@@ -1726,12 +1659,10 @@ Shader "LCBDshader/BaseCutoff"
 				UNITY_VERTEX_OUTPUT_STEREO
 				float4 ase_texcoord1 : TEXCOORD1;
 				UNITY_SHADOW_COORDS(2)
-				float4 ase_lmap : TEXCOORD3;
-				float4 ase_sh : TEXCOORD4;
+				float4 ase_texcoord3 : TEXCOORD3;
+				float4 ase_texcoord4 : TEXCOORD4;
 				float4 ase_texcoord5 : TEXCOORD5;
 				float4 ase_texcoord6 : TEXCOORD6;
-				float4 ase_texcoord7 : TEXCOORD7;
-				float4 ase_texcoord8 : TEXCOORD8;
 			};
 
 			
@@ -1745,42 +1676,23 @@ Shader "LCBDshader/BaseCutoff"
 				
 				float3 ase_worldPos = mul(unity_ObjectToWorld, float4( (v.vertex).xyz, 1 )).xyz;
 				o.ase_texcoord1.xyz = ase_worldPos;
-				#ifdef DYNAMICLIGHTMAP_ON //dynlm
-				o.ase_lmap.zw = v.texcoord2.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
-				#endif //dynlm
-				#ifdef LIGHTMAP_ON //stalm
-				o.ase_lmap.xy = v.texcoord1.xy * unity_LightmapST.xy + unity_LightmapST.zw;
-				#endif //stalm
-				float3 ase_worldNormal = UnityObjectToWorldNormal(v.normal);
-				#ifndef LIGHTMAP_ON //nstalm
-				#if UNITY_SHOULD_SAMPLE_SH //sh
-				o.ase_sh.xyz = 0;
-				#ifdef VERTEXLIGHT_ON //vl
-				o.ase_sh.xyz += Shade4PointLights (
-				unity_4LightPosX0, unity_4LightPosY0, unity_4LightPosZ0,
-				unity_LightColor[0].rgb, unity_LightColor[1].rgb, unity_LightColor[2].rgb, unity_LightColor[3].rgb,
-				unity_4LightAtten0, ase_worldPos, ase_worldNormal);
-				#endif //vl
-				o.ase_sh.xyz = ShadeSHPerVertex (ase_worldNormal, o.ase_sh.xyz);
-				#endif //sh
-				#endif //nstalm
-				o.ase_texcoord5.xyz = ase_worldNormal;
 				float3 ase_worldTangent = UnityObjectToWorldDir(v.ase_tangent);
-				o.ase_texcoord7.xyz = ase_worldTangent;
+				o.ase_texcoord4.xyz = ase_worldTangent;
+				float3 ase_worldNormal = UnityObjectToWorldNormal(v.normal);
+				o.ase_texcoord5.xyz = ase_worldNormal;
 				float ase_vertexTangentSign = v.ase_tangent.w * ( unity_WorldTransformParams.w >= 0.0 ? 1.0 : -1.0 );
 				float3 ase_worldBitangent = cross( ase_worldNormal, ase_worldTangent ) * ase_vertexTangentSign;
-				o.ase_texcoord8.xyz = ase_worldBitangent;
+				o.ase_texcoord6.xyz = ase_worldBitangent;
 				float vertexToFrag1041 = v.ase_color.a;
 				o.ase_texcoord1.w = vertexToFrag1041;
 				
-				o.ase_texcoord6.xy = v.ase_texcoord.xy;
+				o.ase_texcoord3.xy = v.ase_texcoord.xy;
 				
 				//setting value to unused interpolator channels and avoid initialization warnings
-				o.ase_sh.w = 0;
+				o.ase_texcoord3.zw = 0;
+				o.ase_texcoord4.w = 0;
 				o.ase_texcoord5.w = 0;
-				o.ase_texcoord6.zw = 0;
-				o.ase_texcoord7.w = 0;
-				o.ase_texcoord8.w = 0;
+				o.ase_texcoord6.w = 0;
 				
 				v.vertex.xyz +=  float3(0,0,0) ;
 				TRANSFER_SHADOW_CASTER_NORMALOFFSET(o)
@@ -1798,41 +1710,37 @@ Shader "LCBDshader/BaseCutoff"
 				float4 ase_lightColor = _LightColor0;
 				#endif //aselc
 				float3 temp_cast_0 = (_MinDirectLight).xxx;
-				float3 clampResult1037 = clamp( ase_lightColor.rgb , temp_cast_0 , float3( 2,2,2 ) );
+				float3 temp_output_1077_0 = max( ase_lightColor.rgb , temp_cast_0 );
 				float3 ase_worldPos = i.ase_texcoord1.xyz;
 				float3 worldPos985 = ase_worldPos;
 				float localPureLightAttenuation985 = PureLightAttenuation( worldPos985 );
 				UNITY_LIGHT_ATTENUATION(ase_atten, i, ase_worldPos)
-				float3 temp_output_313_0 = ( clampResult1037 * (( _ShadowinLightColor )?( ase_atten ):( localPureLightAttenuation985 )) );
+				float3 temp_output_313_0 = ( temp_output_1077_0 * (( _ShadowinLightColor )?( ase_atten ):( localPureLightAttenuation985 )) );
+				float3 temp_cast_1 = (_MinDirectLight).xxx;
+				float3 temp_cast_2 = (_MinDirectLight).xxx;
 				#ifdef UNITY_PASS_FORWARDADD
 				float3 staticSwitch998 = temp_output_313_0;
 				#else
-				float3 staticSwitch998 = clampResult1037;
+				float3 staticSwitch998 = temp_output_1077_0;
 				#endif
-				float3 temp_cast_1 = (_MaxDirectLight).xxx;
-				float3 clampResult980 = clamp( (( _NoShadowinDirectionalLightColor )?( staticSwitch998 ):( temp_output_313_0 )) , float3( 0,0,0 ) , temp_cast_1 );
-				float3 ase_worldNormal = i.ase_texcoord5.xyz;
-				UnityGIInput data877;
-				UNITY_INITIALIZE_OUTPUT( UnityGIInput, data877 );
-				#if defined(LIGHTMAP_ON) || defined(DYNAMICLIGHTMAP_ON) //dylm877
-				data877.lightmapUV = i.ase_lmap;
-				#endif //dylm877
-				#if UNITY_SHOULD_SAMPLE_SH //fsh877
-				data877.ambient = i.ase_sh;
-				#endif //fsh877
-				UnityGI gi877 = UnityGI_Base(data877, 1, ase_worldNormal);
+				float3 temp_cast_3 = (_MaxDirectLight).xxx;
+				float4 Normal1076 = float4( 0,0,0,0 );
+				float3 localShadeSH9out1076 = ShadeSH9out( Normal1076 );
 				float3 localMaxShadeSH9878 = MaxShadeSH9();
-				float3 temp_cast_2 = (_MinIndirectLight).xxx;
-				float3 temp_cast_3 = (_MaxIndirectLight).xxx;
-				float3 clampResult981 = clamp( (( _UnifyIndirectDiffuseLight )?( localMaxShadeSH9878 ):( gi877.indirect.diffuse )) , temp_cast_2 , temp_cast_3 );
-				float3 temp_output_964_0 = max( clampResult980 , clampResult981 );
+				float3 temp_cast_4 = (_MinIndirectLight).xxx;
+				float3 temp_cast_5 = (_MaxIndirectLight).xxx;
+				float3 temp_output_964_0 = max( min( (( _NoShadowinDirectionalLightColor )?( staticSwitch998 ):( temp_output_313_0 )) , temp_cast_3 ) , min( max( (( _UnifyIndirectDiffuseLight )?( localMaxShadeSH9878 ):( localShadeSH9out1076 )) , temp_cast_4 ) , temp_cast_5 ) );
+				float3 temp_cast_6 = (_MinDirectLight).xxx;
+				float3 temp_cast_7 = (_MaxDirectLight).xxx;
+				float3 temp_cast_8 = (_MinIndirectLight).xxx;
+				float3 temp_cast_9 = (_MaxIndirectLight).xxx;
 				float grayscale1020 = dot(temp_output_964_0, float3(0.299,0.587,0.114));
-				float3 temp_cast_4 = (grayscale1020).xxx;
-				float3 lerpResult1019 = lerp( temp_output_964_0 , temp_cast_4 , _LightColorGrayScale);
+				float3 temp_cast_10 = (grayscale1020).xxx;
+				float3 lerpResult1019 = lerp( temp_output_964_0 , temp_cast_10 , _LightColorGrayScale);
 				float3 LightColor208 = lerpResult1019;
 				float4 lerpResult1014 = lerp( float4( LightColor208 , 0.0 ) , _GlobalRimColor , _CustomRimLightColor);
-				float4 temp_cast_6 = (_MinRimLightColor).xxxx;
-				float4 clampResult1015 = clamp( lerpResult1014 , temp_cast_6 , float4( 1,1,1,0 ) );
+				float4 temp_cast_12 = (_MinRimLightColor).xxxx;
+				float4 clampResult1015 = clamp( lerpResult1014 , temp_cast_12 , float4( 1,1,1,0 ) );
 				float4 SpecularColor539 = _SpecularColor;
 				float4 RimColor2541 = _RimColor2;
 				float4 lerpResult543 = lerp( SpecularColor539 , RimColor2541 , _RimSpecRate2);
@@ -1840,9 +1748,10 @@ Shader "LCBDshader/BaseCutoff"
 				float3 localh_bias510 = h_bias();
 				float3 ase_worldViewDir = UnityWorldSpaceViewDir(ase_worldPos);
 				ase_worldViewDir = normalize(ase_worldViewDir);
-				float2 uv_BumpMap = i.ase_texcoord6.xy * _BumpMap_ST.xy + _BumpMap_ST.zw;
-				float3 ase_worldTangent = i.ase_texcoord7.xyz;
-				float3 ase_worldBitangent = i.ase_texcoord8.xyz;
+				float2 uv_BumpMap = i.ase_texcoord3.xy * _BumpMap_ST.xy + _BumpMap_ST.zw;
+				float3 ase_worldTangent = i.ase_texcoord4.xyz;
+				float3 ase_worldNormal = i.ase_texcoord5.xyz;
+				float3 ase_worldBitangent = i.ase_texcoord6.xyz;
 				float3 tanToWorld0 = float3( ase_worldTangent.x, ase_worldBitangent.x, ase_worldNormal.x );
 				float3 tanToWorld1 = float3( ase_worldTangent.y, ase_worldBitangent.y, ase_worldNormal.y );
 				float3 tanToWorld2 = float3( ase_worldTangent.z, ase_worldBitangent.z, ase_worldNormal.z );
@@ -1851,7 +1760,7 @@ Shader "LCBDshader/BaseCutoff"
 				float3 WorldNormal1054 = worldNormal1053;
 				float dotResult505 = dot( ( ( -1.0 * localv_bias502 * _RimVerticalOffset2 ) + ( ( 1.0 - abs( _RimVerticalOffset2 ) ) * ( ( -1.0 * localh_bias510 * _RimHorizonOffset2 ) + ( ( 1.0 - abs( _RimHorizonOffset2 ) ) * ase_worldViewDir ) ) ) ) , WorldNormal1054 );
 				float rimoffset_Facing2513 = dotResult505;
-				float2 uv_BaseTex = i.ase_texcoord6.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
+				float2 uv_BaseTex = i.ase_texcoord3.xy * _BaseTex_ST.xy + _BaseTex_ST.zw;
 				float4 tex2DNode66 = tex2D( _BaseTex, uv_BaseTex );
 				float RimMask355 = tex2DNode66.b;
 				float dis_rim360 = ( (( _Use_DisRimMask )?( ( RimMask355 - 0.5 ) ):( 0.0 )) + 0.5 );
@@ -1873,14 +1782,14 @@ Shader "LCBDshader/BaseCutoff"
 				float4 lerpResult973 = lerp( ( _SpecularColor * SpecularPower438 ) , ( _SpecularColor * SpecularPower438 * float4( LightColor208 , 0.0 ) ) , GlobalLightFactor966);
 				float vertexToFrag1041 = i.ase_texcoord1.w;
 				float VertexColorShadowMask648 = (( _UseShadowMaskVertexColorA )?( vertexToFrag1041 ):( 1.0 ));
-				float2 uv_MainTex = i.ase_texcoord6.xy * _MainTex_ST.xy + _MainTex_ST.zw;
+				float2 uv_MainTex = i.ase_texcoord3.xy * _MainTex_ST.xy + _MainTex_ST.zw;
 				float4 tex2DNode64 = tex2D( _MainTex, uv_MainTex );
 				float4 diff345 = tex2DNode64;
 				float DiffuseLightFactor1035 = _DiffuseLightFactor;
 				float4 lerpResult969 = lerp( diff345 , ( diff345 * float4( LightColor208 , 0.0 ) ) , DiffuseLightFactor1035);
 				float4 lit_diff349 = lerpResult969;
 				float4 toon_diff370 = ( (( _UseShadowMaskVertexColorA )?( vertexToFrag1041 ):( 1.0 )) == 1.0 ? ( 0.5 >= _ToonBrightColor.a ? ( _ToonBrightColor * lit_diff349 ) : ( _ToonBrightColor + lit_diff349 ) ) : lit_diff349 );
-				float2 uv_ShadTex = i.ase_texcoord6.xy * _ShadTex_ST.xy + _ShadTex_ST.zw;
+				float2 uv_ShadTex = i.ase_texcoord3.xy * _ShadTex_ST.xy + _ShadTex_ST.zw;
 				float4 shad_c330 = tex2D( _ShadTex, uv_ShadTex );
 				float4 lerpResult968 = lerp( ( shad_c330 * _GlobalShadowColor ) , ( shad_c330 * _GlobalShadowColor * float4( LightColor208 , 0.0 ) ) , DiffuseLightFactor1035);
 				float4 lit_shad344 = lerpResult968;
@@ -1904,7 +1813,7 @@ Shader "LCBDshader/BaseCutoff"
 				float4 tex2DNode958 = tex2D( _RflTex, ( ( float3( float2( 1,1 ) ,  0.0 ) + normal2view521 ) * 0.5 ).xy );
 				float4 RflMul943 = ( ( tex2DNode958.g * ( _RflMulBias * 10 ) * _ReflectionMulColor ) + _RflMulOffset );
 				float RflAdd938 = ( _RflAddBias * 10.0 * pow( tex2DNode958.r , _RflAddPowVal ) );
-				float2 uv_CtrlTex = i.ase_texcoord6.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
+				float2 uv_CtrlTex = i.ase_texcoord3.xy * _CtrlTex_ST.xy + _CtrlTex_ST.zw;
 				float ReflectionMask927 = (( _Use_ReflectionMask )?( tex2D( _CtrlTex, uv_CtrlTex ).r ):( 0.0 ));
 				float4 lerpResult940 = lerp( EnvSpecShaded_diff542 , ( ( EnvSpecShaded_diff542 * RflMul943 ) + ( RflAdd938 * _ReflectionAddColor ) ) , saturate( ( _RflRate * ReflectionMask927 ) ));
 				float4 Env2SpecShaded_diff939 = lerpResult940;
@@ -1921,25 +1830,25 @@ Shader "LCBDshader/BaseCutoff"
 				float4 Rim2EnvSpecShaded_diff577 = ( ( clampResult1015 * ( lerpResult543 * RimStrength2462 ) * ( saturate( lerpResult1010 ) + _RimShadowRate2 ) ) + RimEnvSpecShaded_diff562 );
 				float4 realRim578 = temp_output_563_0;
 				float4 break592 = realRim578;
-				float2 uv_DirtTex = i.ase_texcoord6.xy * _DirtTex_ST.xy + _DirtTex_ST.zw;
+				float2 uv_DirtTex = i.ase_texcoord3.xy * _DirtTex_ST.xy + _DirtTex_ST.zw;
 				float4 dirt620 = tex2D( _DirtTex, uv_DirtTex );
 				float4 break582 = ( dirt620 * _DirtScale );
 				float DirtPower590 = ( ( _DirtRateR * break582.r ) + ( _DirtRateG * break582.g ) + ( break582.b * _DirtRateB ) );
 				float4 lerpResult597 = lerp( Rim2EnvSpecShaded_diff577 , ( 1E-05 >= ( break592.r + break592.g + break592.b ) ? _GlobalDirtColor : _GlobalDirtRimSpecularColor ) , DirtPower590);
 				float4 DirtRim2EnvSpecShaded_diff601 = lerpResult597;
 				float4 lerpResult978 = lerp( ( _CharaColor * DirtRim2EnvSpecShaded_diff601 ) , ( _CharaColor * DirtRim2EnvSpecShaded_diff601 * float4( LightColor208 , 0.0 ) ) , GlobalLightFactor966);
-				float2 uv_EmiTex = i.ase_texcoord6.xy * _EmiTex_ST.xy + _EmiTex_ST.zw;
+				float2 uv_EmiTex = i.ase_texcoord3.xy * _EmiTex_ST.xy + _EmiTex_ST.zw;
 				float4 Emissive600 = tex2D( _EmiTex, uv_EmiTex );
 				float mulTime914 = _Time.y * 0.1;
 				float2 appendResult920 = (float2(( _DynEmiScrollX * mulTime914 ) , ( mulTime914 * _DynEmiScrollY )));
-				float2 texCoord913 = i.ase_texcoord6.xy * float2( 1,1 ) + appendResult920;
+				float2 texCoord913 = i.ase_texcoord3.xy * float2( 1,1 ) + appendResult920;
 				float4 DynEmi907 = tex2D( _DynamicEmmisive_dyn_emi, texCoord913 );
-				float2 uv_DynamicEmmisiveMask_dyn_emi_mask = i.ase_texcoord6.xy * _DynamicEmmisiveMask_dyn_emi_mask_ST.xy + _DynamicEmmisiveMask_dyn_emi_mask_ST.zw;
+				float2 uv_DynamicEmmisiveMask_dyn_emi_mask = i.ase_texcoord3.xy * _DynamicEmmisiveMask_dyn_emi_mask_ST.xy + _DynamicEmmisiveMask_dyn_emi_mask_ST.zw;
 				float4 DynEmiMask908 = tex2D( _DynamicEmmisiveMask_dyn_emi_mask, uv_DynamicEmmisiveMask_dyn_emi_mask );
 				float4 Refined_diff612 = ( lerpResult978 + ( ( 1.0 - DirtPower590 ) * Emissive600 * _EmissiveColor * _EmmisiveStrength ) + ( ( 1.0 - DirtPower590 ) * DynEmi907 * DynEmiMask908 * _DynEmissiveColor * _DynEmmisiveStrength ) );
 				float dotResult614 = dot( _UnsaturationColor , Refined_diff612 );
-				float4 temp_cast_18 = (dotResult614).xxxx;
-				float4 lerpResult616 = lerp( temp_cast_18 , Refined_diff612 , _Saturation);
+				float4 temp_cast_24 = (dotResult614).xxxx;
+				float4 lerpResult616 = lerp( temp_cast_24 , Refined_diff612 , _Saturation);
 				float4 output_diff618 = lerpResult616;
 				float Alpha646 = tex2DNode64.a;
 				clip( Alpha646 - _ClipValue);
@@ -1958,11 +1867,11 @@ Shader "LCBDshader/BaseCutoff"
 	Fallback Off
 }
 /*ASEBEGIN
-Version=19107
+Version=19200
 Node;AmplifyShaderEditor.CommentaryNode;1056;-3327.042,-2615.52;Inherit;False;1078.991;2141.447;;25;620;908;906;401;350;600;907;68;905;67;355;559;927;928;66;408;436;345;330;64;65;646;1053;1054;1055;Texture Input;1,1,1,1;0;0
 Node;AmplifyShaderEditor.CommentaryNode;1048;-2738.261,-305.3634;Inherit;False;2114.011;584.3451;;21;530;852;532;528;874;531;840;535;533;537;542;1046;1047;449;450;451;527;448;1073;1074;1075;Metal Process;1,1,1,1;0;0
 Node;AmplifyShaderEditor.CommentaryNode;1033;-619.8849,2106.935;Inherit;False;1413.963;1597.72;;37;727;737;740;742;729;732;872;873;733;900;903;730;1023;1024;1025;1026;1027;1028;1029;1030;1031;1032;745;744;746;743;747;748;749;750;751;1064;1065;1066;1067;1068;1069;Outline;1,1,1,1;0;0
-Node;AmplifyShaderEditor.CommentaryNode;1022;-5128.396,1513.659;Inherit;False;2782.71;997.62;;50;551;552;803;802;779;778;776;800;801;799;797;798;773;825;781;877;878;879;303;301;981;965;966;826;964;980;982;983;985;986;987;988;989;990;313;999;998;984;1000;1019;1020;1021;208;1034;1035;1037;1038;1039;1062;1063;Light;1,1,1,1;0;0
+Node;AmplifyShaderEditor.CommentaryNode;1022;-5128.396,1513.659;Inherit;False;2782.71;997.62;;51;551;552;803;802;779;778;776;800;801;799;797;798;773;825;781;878;879;303;301;965;966;826;964;982;983;985;986;987;988;989;990;313;999;998;984;1000;1019;1020;1021;208;1034;1035;1038;1039;1062;1063;1076;1077;1078;1079;1080;Light;1,1,1,1;0;0
 Node;AmplifyShaderEditor.CommentaryNode;1018;-2273.235,1713.355;Inherit;False;1534.258;2299.969;;73;410;411;413;423;425;424;427;421;409;412;540;452;453;454;458;459;461;455;462;457;456;541;359;358;564;565;570;563;560;546;562;357;356;360;578;354;460;426;1001;572;556;568;569;1007;573;1002;1008;1009;1014;1015;558;1016;1017;566;557;547;548;561;576;577;567;555;575;553;1004;1010;1012;1005;1011;544;545;543;1036;Rim Process;1,1,1,1;0;0
 Node;AmplifyShaderEditor.CommentaryNode;972;-2155.103,-3355.5;Inherit;False;1312.803;1918.691;;49;338;337;339;334;336;335;387;394;386;381;392;405;393;371;369;365;366;368;370;648;399;383;372;649;382;647;340;343;420;967;342;968;344;971;346;347;970;348;969;349;364;375;992;993;994;997;996;995;1041;Shadow Process;1,1,1,1;0;0
 Node;AmplifyShaderEditor.CommentaryNode;926;-597.0533,255.1348;Inherit;False;1086.413;1724.994;;31;603;605;604;606;612;602;609;607;608;910;911;610;912;611;904;916;917;918;919;613;614;615;616;617;618;871;894;895;977;978;979;Emmisive and Other Process;1,1,1,1;0;0
@@ -2104,7 +2013,7 @@ Node;AmplifyShaderEditor.GetLocalVarNode;917;-512.5084,1230.39;Inherit;False;908
 Node;AmplifyShaderEditor.CommentaryNode;962;593.1373,1103.615;Inherit;False;225;166;;1;963;Cull;1,1,1,1;0;0
 Node;AmplifyShaderEditor.RangedFloatNode;963;643.1373,1153.615;Inherit;False;Property;_CullMode;Cull Mode;102;1;[Enum];Create;True;0;0;1;UnityEngine.Rendering.CullMode;True;0;False;2;0;0;0;0;1;FLOAT;0
 Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;890;557.7748,1800.713;Float;False;True;-1;2;ASEMaterialInspector;100;12;LCBDshader/BaseCutoff;fe4af87006695164d84819765fe282b7;True;ForwardBase;0;1;ForwardBase;3;False;False;False;False;False;False;False;False;False;False;False;False;False;True;True;0;False;_CullMode;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;RenderType=TransparentCutout=RenderType;Queue=AlphaTest=Queue=0;True;2;False;0;True;True;0;1;False;;0;False;;3;1;False;;10;False;;True;1;False;;1;False;;False;False;False;False;False;False;False;False;False;True;0;False;;True;True;0;True;_CullMode;False;True;True;True;True;True;0;False;;False;False;False;False;False;False;True;True;True;0;True;_StencilReference;255;True;_StencilReadMask;255;True;_StencilWriteMask;0;True;_StencilComparison;0;True;_StencilPassFront;0;True;_StencilFailFront;0;True;_StencilZFailFront;0;False;;0;False;;0;False;;0;False;;False;True;1;False;;True;3;False;;True;True;0;False;;0;False;;True;1;LightMode=ForwardBase;True;2;False;0;;0;0;Standard;0;0;5;True;True;True;False;True;False;;False;0
-Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;891;557.7748,1910.713;Float;False;False;-1;2;ASEMaterialInspector;100;12;New Amplify Shader;fe4af87006695164d84819765fe282b7;True;ForwardAdd;0;2;ForwardAdd;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;RenderType=Opaque=RenderType;Queue=Geometry=Queue=0;True;2;False;0;True;True;4;1;False;;1;False;;1;0;False;;1;False;;True;5;False;;5;False;;False;False;False;False;False;False;False;False;False;True;0;False;;True;True;0;True;_CullMode;False;True;True;True;True;True;0;False;;False;False;False;False;False;False;True;True;True;0;True;_StencilReference;255;True;_StencilReadMask;255;True;_StencilWriteMask;0;True;_StencilComparison;0;True;_StencilPassFront;0;True;_StencilFailFront;0;True;_StencilZFailFront;0;False;;0;False;;0;False;;0;False;;False;True;2;False;;False;False;True;1;LightMode=ForwardAdd;True;2;False;0;;0;0;Standard;0;False;0
+Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;891;557.7748,1912.713;Float;False;False;-1;2;ASEMaterialInspector;100;12;New Amplify Shader;fe4af87006695164d84819765fe282b7;True;ForwardAdd;0;2;ForwardAdd;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;RenderType=Opaque=RenderType;Queue=Geometry=Queue=0;True;2;False;0;True;True;4;1;False;;1;False;;1;0;False;;1;False;;True;5;False;;5;False;;False;False;False;False;False;False;False;False;False;True;0;False;;True;True;0;True;_CullMode;False;True;True;True;True;True;0;False;;False;False;False;False;False;False;True;True;True;0;True;_StencilReference;255;True;_StencilReadMask;255;True;_StencilWriteMask;0;True;_StencilComparison;0;True;_StencilPassFront;0;True;_StencilFailFront;0;True;_StencilZFailFront;0;False;;0;False;;0;False;;0;False;;False;True;2;False;;False;False;True;1;LightMode=ForwardAdd;True;2;False;0;;0;0;Standard;0;False;0
 Node;AmplifyShaderEditor.ColorNode;942;-1706.129,809.2989;Inherit;False;Property;_ReflectionMulColor;ReflectionMulColor;48;1;[HDR];Create;True;0;0;0;False;0;False;1,1,1,0;0,0,0,0;True;0;5;COLOR;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4
 Node;AmplifyShaderEditor.ColorNode;949;-2076.014,1220.195;Inherit;False;Property;_ReflectionAddColor;ReflectionAddColor;47;1;[HDR];Create;True;0;0;0;False;0;False;1,1,1,0;0,0,0,0;True;0;5;COLOR;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4
 Node;AmplifyShaderEditor.ColorNode;442;-1914.769,-797.661;Inherit;False;Property;_SpecularColor;SpecularColor;14;2;[HDR];[Header];Create;True;1;Specular;0;0;False;0;False;1,1,1,1;1,1,1,1;True;0;5;COLOR;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4
@@ -2255,8 +2164,6 @@ Node;AmplifyShaderEditor.ScaleAndOffsetNode;776;-4725.555,2121.669;Inherit;False
 Node;AmplifyShaderEditor.RegisterLocalVarNode;801;-4525.735,1589.818;Inherit;False;LightDir;-1;True;1;0;FLOAT3;0,0,0;False;1;FLOAT3;0
 Node;AmplifyShaderEditor.WorldSpaceLightDirHlpNode;799;-5075.083,1640.371;Inherit;False;False;1;0;FLOAT;0;False;4;FLOAT3;0;FLOAT;1;FLOAT;2;FLOAT;3
 Node;AmplifyShaderEditor.RegisterLocalVarNode;781;-4542.957,2114.995;Inherit;False;HalfLambertTerm;-1;True;1;0;FLOAT;0;False;1;FLOAT;0
-Node;AmplifyShaderEditor.ClampOpNode;981;-3255.859,2163.019;Inherit;False;3;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;2;FLOAT3;1,0,0;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.SimpleMaxOpNode;964;-3034.498,1912.547;Inherit;False;2;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;1;FLOAT3;0
 Node;AmplifyShaderEditor.LightAttenuation;986;-5078.396,2308.95;Inherit;False;0;1;FLOAT;0
 Node;AmplifyShaderEditor.SaturateNode;987;-4894.454,2310.867;Inherit;False;1;0;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.ScaleAndOffsetNode;988;-4757.755,2341.922;Inherit;False;3;0;FLOAT;0;False;1;FLOAT;1;False;2;FLOAT;0;False;1;FLOAT;0
@@ -2294,11 +2201,6 @@ Node;AmplifyShaderEditor.RangedFloatNode;965;-2842.423,2406.686;Inherit;False;Pr
 Node;AmplifyShaderEditor.RangedFloatNode;1034;-2841.928,2319.533;Inherit;False;Property;_DiffuseLightFactor;DiffuseLightFactor;79;0;Create;True;0;0;0;False;0;False;0;1;0;1;0;1;FLOAT;0
 Node;AmplifyShaderEditor.GetLocalVarNode;970;-1682.286,-3133.442;Inherit;False;1035;DiffuseLightFactor;1;0;OBJECT;;False;1;FLOAT;0
 Node;AmplifyShaderEditor.GetLocalVarNode;1036;-1955.791,3200.903;Inherit;False;208;LightColor;1;0;OBJECT;;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.IndirectDiffuseLighting;877;-3763.4,2107.826;Inherit;False;Tangent;1;0;FLOAT3;0,0,1;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.CustomExpressionNode;878;-3707.44,2190.312;Inherit;False;return max(ShadeSH9(half4(0, 0, 0, 1)).rgb, ShadeSH9(half4(0, -1, 0, 1)).rgb)@;3;Create;0;MaxShadeSH9;False;False;0;;False;0;1;FLOAT3;0
-Node;AmplifyShaderEditor.ToggleSwitchNode;879;-3541.927,2134.313;Inherit;False;Property;_UnifyIndirectDiffuseLight;Unify IndirectDiffuseLight;75;0;Create;True;0;0;0;False;0;False;1;True;2;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.RangedFloatNode;301;-3548.814,2316.93;Inherit;False;Property;_MaxIndirectLight;MaxIndirectLight;77;0;Create;True;0;0;0;False;0;False;1;1;0;2;0;1;FLOAT;0
-Node;AmplifyShaderEditor.RangedFloatNode;303;-3557.411,2235.008;Inherit;False;Property;_MinIndirectLight;MinIndirectLight;76;0;Create;True;0;0;0;False;0;False;0.1;0.3;0;1;0;1;FLOAT;0
 Node;AmplifyShaderEditor.WorldPosInputsNode;982;-4405.464,1865.184;Inherit;False;0;4;FLOAT3;0;FLOAT;1;FLOAT;2;FLOAT;3
 Node;AmplifyShaderEditor.LightAttenuation;983;-4229.784,1932.422;Inherit;False;0;1;FLOAT;0
 Node;AmplifyShaderEditor.CustomExpressionNode;985;-4233.753,1847.711;Inherit;False;#ifdef POINT$        unityShadowCoord3 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1)).xyz@ \$        return tex2D(_LightTexture0, dot(lightCoord, lightCoord).rr).r@$#endif$$#ifdef SPOT$#if !defined(UNITY_HALF_PRECISION_FRAGMENT_SHADER_REGISTERS)$#define DECLARE_LIGHT_COORD(input, worldPos) unityShadowCoord4 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1))$#else$#define DECLARE_LIGHT_COORD(input, worldPos) unityShadowCoord4 lightCoord = input._LightCoord$#endif$        DECLARE_LIGHT_COORD(input, worldPos)@ \$        return (lightCoord.z > 0) * UnitySpotCookie(lightCoord) * UnitySpotAttenuate(lightCoord.xyz)@$#endif$$#ifdef DIRECTIONAL$        return 1@$#endif$$#ifdef POINT_COOKIE$#   if !defined(UNITY_HALF_PRECISION_FRAGMENT_SHADER_REGISTERS)$#       define DECLARE_LIGHT_COORD(input, worldPos) unityShadowCoord3 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1)).xyz$#   else$#       define DECLARE_LIGHT_COORD(input, worldPos) unityShadowCoord3 lightCoord = input._LightCoord$#   endif$        DECLARE_LIGHT_COORD(input, worldPos)@ \$        return tex2D(_LightTextureB0, dot(lightCoord, lightCoord).rr).r * texCUBE(_LightTexture0, lightCoord).w@$#endif$$#ifdef DIRECTIONAL_COOKIE$#   if !defined(UNITY_HALF_PRECISION_FRAGMENT_SHADER_REGISTERS)$#       define DECLARE_LIGHT_COORD(input, worldPos) unityShadowCoord2 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1)).xy$#   else$#       define DECLARE_LIGHT_COORD(input, worldPos) unityShadowCoord2 lightCoord = input._LightCoord$#   endif$        DECLARE_LIGHT_COORD(input, worldPos)@ \$        return tex2D(_LightTexture0, lightCoord).w@$#endif;1;Create;1;True;worldPos;FLOAT3;0,0,0;In;;Inherit;False;Pure Light Attenuation;False;False;0;;False;1;0;FLOAT3;0,0,0;False;1;FLOAT;0
@@ -2306,12 +2208,9 @@ Node;AmplifyShaderEditor.ToggleSwitchNode;984;-4021.868,1923.773;Inherit;False;P
 Node;AmplifyShaderEditor.RegisterLocalVarNode;1000;-4009.942,1838.927;Inherit;False;RimAtten;-1;True;1;0;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.ToggleSwitchNode;999;-3462.376,1633.965;Inherit;False;Property;_NoShadowinDirectionalLightColor;NoShadow in DirectionalLightColor;12;0;Create;True;0;0;0;False;0;False;1;True;2;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;1;FLOAT3;0
 Node;AmplifyShaderEditor.StaticSwitch;998;-3745.588,1597.667;Inherit;False;Property;_Keyword1;Keyword 0;6;0;Create;True;0;0;0;False;0;False;0;0;0;False;UNITY_PASS_FORWARDADD;Toggle;2;Key0;Key1;Fetch;False;True;All;9;1;FLOAT3;0,0,0;False;0;FLOAT3;0,0,0;False;2;FLOAT3;0,0,0;False;3;FLOAT3;0,0,0;False;4;FLOAT3;0,0,0;False;5;FLOAT3;0,0,0;False;6;FLOAT3;0,0,0;False;7;FLOAT3;0,0,0;False;8;FLOAT3;0,0,0;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.ClampOpNode;1037;-3950.112,1650.446;Inherit;False;3;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;2;FLOAT3;2,2,2;False;1;FLOAT3;0
 Node;AmplifyShaderEditor.LightColorNode;773;-4211.34,1598.772;Inherit;False;0;3;COLOR;0;FLOAT3;1;FLOAT;2
 Node;AmplifyShaderEditor.RangedFloatNode;825;-4271.981,1729.644;Inherit;False;Property;_MinDirectLight;MinDirectLight;73;1;[Header];Create;True;1;Light;0;0;False;0;False;0;0.2;0;1;0;1;FLOAT;0
 Node;AmplifyShaderEditor.SimpleMultiplyOpNode;313;-3804.862,1763.433;Inherit;False;2;2;0;FLOAT3;0,0,0;False;1;FLOAT;0;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.ClampOpNode;980;-3176.311,1767.564;Inherit;False;3;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;2;FLOAT3;1,0,0;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.RangedFloatNode;826;-3466.776,1857.781;Inherit;False;Property;_MaxDirectLight;MaxDirectLight;74;0;Create;True;0;0;0;False;0;False;1;0;0;2;0;1;FLOAT;0
 Node;AmplifyShaderEditor.RegisterLocalVarNode;966;-2570.159,2405.621;Inherit;False;GlobalLightFactor;-1;True;1;0;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.RegisterLocalVarNode;1035;-2563.928,2320.533;Inherit;False;DiffuseLightFactor;-1;True;1;0;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.Compare;800;-4693.766,1590.476;Inherit;False;0;4;0;FLOAT;0;False;1;FLOAT;1;False;2;FLOAT3;0,0,0;False;3;FLOAT3;0,0,0;False;1;FLOAT3;0
@@ -2414,6 +2313,17 @@ Node;AmplifyShaderEditor.GetLocalVarNode;1074;-1507.76,124.9089;Inherit;False;35
 Node;AmplifyShaderEditor.RangedFloatNode;1075;-1603.952,202.1014;Inherit;False;Property;_MetalMaskOffset;MetalMaskOffset;42;0;Create;True;0;0;0;False;0;False;0;0;-1;1;0;1;FLOAT;0
 Node;AmplifyShaderEditor.RangedFloatNode;530;-2071.492,54.47207;Inherit;False;Property;_EnvRate;EnvRate;43;0;Create;True;0;0;0;False;0;False;1;0.5;0;10;0;1;FLOAT;0
 Node;AmplifyShaderEditor.TFHCRemapNode;852;-1779.613,57.84087;Inherit;False;5;0;FLOAT;0;False;1;FLOAT;0;False;2;FLOAT;10;False;3;FLOAT;0;False;4;FLOAT;100;False;1;FLOAT;0
+Node;AmplifyShaderEditor.SimpleMaxOpNode;1077;-3956.248,1658.988;Inherit;False;2;0;FLOAT3;0,0,0;False;1;FLOAT;0;False;1;FLOAT3;0
+Node;AmplifyShaderEditor.RangedFloatNode;826;-3451.176,1797.981;Inherit;False;Property;_MaxDirectLight;MaxDirectLight;74;0;Create;True;0;0;0;False;0;False;1;0;0;2;0;1;FLOAT;0
+Node;AmplifyShaderEditor.SimpleMaxOpNode;964;-3034.498,1912.547;Inherit;False;2;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;1;FLOAT3;0
+Node;AmplifyShaderEditor.SimpleMinOpNode;1078;-3147.649,1739.588;Inherit;False;2;0;FLOAT3;0,0,0;False;1;FLOAT;0;False;1;FLOAT3;0
+Node;AmplifyShaderEditor.CustomExpressionNode;878;-3883.371,2148.712;Inherit;False;return max(ShadeSH9(half4(0, 0, 0, 1)).rgb, ShadeSH9(half4(0, -1, 0, 1)).rgb)@;3;Create;0;MaxShadeSH9;False;False;0;;False;0;1;FLOAT3;0
+Node;AmplifyShaderEditor.ToggleSwitchNode;879;-3717.858,2092.713;Inherit;False;Property;_UnifyIndirectDiffuseLight;Unify IndirectDiffuseLight;75;0;Create;True;0;0;0;False;0;False;1;True;2;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;1;FLOAT3;0
+Node;AmplifyShaderEditor.RangedFloatNode;301;-3724.745,2275.33;Inherit;False;Property;_MaxIndirectLight;MaxIndirectLight;77;0;Create;True;0;0;0;False;0;False;1;1;0;2;0;1;FLOAT;0
+Node;AmplifyShaderEditor.RangedFloatNode;303;-3733.342,2193.408;Inherit;False;Property;_MinIndirectLight;MinIndirectLight;76;0;Create;True;0;0;0;False;0;False;0.1;0.3;0;1;0;1;FLOAT;0
+Node;AmplifyShaderEditor.CustomExpressionNode;1076;-3912.911,2063.595;Inherit;False;return ShadeSH9(Normal)@;3;Create;1;True;Normal;FLOAT4;0,0,0,0;In;;Half;False;ShadeSH9out;False;False;0;;False;1;0;FLOAT4;0,0,0,0;False;1;FLOAT3;0
+Node;AmplifyShaderEditor.SimpleMaxOpNode;1079;-3417.839,2093.476;Inherit;False;2;0;FLOAT3;0,0,0;False;1;FLOAT;0;False;1;FLOAT3;0
+Node;AmplifyShaderEditor.SimpleMinOpNode;1080;-3283.354,2139.168;Inherit;False;2;0;FLOAT3;0,0,0;False;1;FLOAT;0;False;1;FLOAT3;0
 WireConnection;319;0;315;0
 WireConnection;322;0;319;0
 WireConnection;636;0;322;0
@@ -2702,11 +2612,6 @@ WireConnection;776;1;778;0
 WireConnection;776;2;778;0
 WireConnection;801;0;800;0
 WireConnection;781;0;776;0
-WireConnection;981;0;879;0
-WireConnection;981;1;303;0
-WireConnection;981;2;301;0
-WireConnection;964;0;980;0
-WireConnection;964;1;981;0
 WireConnection;987;0;986;0
 WireConnection;988;0;987;0
 WireConnection;988;1;989;0
@@ -2738,22 +2643,16 @@ WireConnection;750;1;749;0
 WireConnection;751;1;750;0
 WireConnection;889;0;900;0
 WireConnection;889;3;743;0
-WireConnection;879;0;877;0
-WireConnection;879;1;878;0
 WireConnection;985;0;982;0
 WireConnection;984;0;985;0
 WireConnection;984;1;983;0
 WireConnection;1000;0;985;0
 WireConnection;999;0;313;0
 WireConnection;999;1;998;0
-WireConnection;998;1;1037;0
+WireConnection;998;1;1077;0
 WireConnection;998;0;313;0
-WireConnection;1037;0;773;1
-WireConnection;1037;1;825;0
-WireConnection;313;0;1037;0
+WireConnection;313;0;1077;0
 WireConnection;313;1;984;0
-WireConnection;980;0;999;0
-WireConnection;980;2;826;0
 WireConnection;966;0;965;0
 WireConnection;1035;0;1034;0
 WireConnection;800;0;797;0
@@ -2842,5 +2741,17 @@ WireConnection;531;1;1073;0
 WireConnection;1073;0;1074;0
 WireConnection;1073;1;1075;0
 WireConnection;852;0;530;0
+WireConnection;1077;0;773;1
+WireConnection;1077;1;825;0
+WireConnection;964;0;1078;0
+WireConnection;964;1;1080;0
+WireConnection;1078;0;999;0
+WireConnection;1078;1;826;0
+WireConnection;879;0;1076;0
+WireConnection;879;1;878;0
+WireConnection;1079;0;879;0
+WireConnection;1079;1;303;0
+WireConnection;1080;0;1079;0
+WireConnection;1080;1;301;0
 ASEEND*/
-//CHKSM=C48031BD2478B6BF1B0B0C07B97D4B3E0CC7FF2D
+//CHKSM=D50516A23B1F475A02277C409D33D6D3683A2B6D
